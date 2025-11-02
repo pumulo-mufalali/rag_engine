@@ -37,7 +37,7 @@ export function FeedResults({ result }: FeedResultsProps) {
 
         <div>
           <h3 className="text-lg font-bold mb-4 text-foreground">Ration Breakdown</h3>
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <Table>
             <TableHeader>
               <TableRow>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,16 +8,18 @@ import { IngredientList } from '@/components/feed/IngredientList';
 import { FeedResults } from '@/components/feed/FeedResults';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form } from '@/components/ui/form';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Loader2 } from 'lucide-react';
-import type { FeedRation } from '@istock/shared';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Loader2, BookOpen } from 'lucide-react';
+import type { FeedRation, FeedIngredient } from '@istock/shared';
+import { useNotification } from '@/contexts/NotificationContext';
+import { Label } from '@/components/ui/label';
 
 const feedOptimizerSchema = z.object({
   targetAnimal: z.enum(['Dairy Cattle', 'Beef Cattle', 'Calf']),
@@ -41,7 +43,15 @@ type FeedOptimizerForm = z.infer<typeof feedOptimizerSchema>;
 
 export function FeedOptimizer() {
   const [result, setResult] = useState<FeedRation | null>(null);
+  const [savedIngredients, setSavedIngredients] = useState<FeedIngredient[]>([]);
   const optimizeFeed = useOptimizeFeed();
+  const { success } = useNotification();
+
+  useEffect(() => {
+    // Load saved ingredients from localStorage
+    const stored = JSON.parse(localStorage.getItem('istock_ingredients') || '[]');
+    setSavedIngredients(stored);
+  }, []);
 
   const form = useForm<FeedOptimizerForm>({
     resolver: zodResolver(feedOptimizerSchema),
@@ -65,6 +75,20 @@ export function FeedOptimizer() {
     name: 'ingredients',
   });
 
+  const loadSavedIngredient = (ingredient: FeedIngredient) => {
+    fieldArray.append({
+      name: ingredient.name,
+      unitPrice: ingredient.unitPrice,
+      nutritionalValues: {
+        protein: ingredient.nutritionalValues.protein || 0,
+        energy: ingredient.nutritionalValues.energy || 0,
+        fiber: ingredient.nutritionalValues.fiber || 0,
+        fat: ingredient.nutritionalValues.fat || 0,
+      },
+    });
+    success(`Added ${ingredient.name} from library`);
+  };
+
   const onSubmit = async (data: FeedOptimizerForm) => {
     try {
       const response = await optimizeFeed.mutateAsync({
@@ -82,15 +106,28 @@ export function FeedOptimizer() {
       });
 
       setResult(response);
+
+      // Save to localStorage for dashboard
+      const feedRecord = {
+        id: `feed-${Date.now()}`,
+        targetAnimal: data.targetAnimal,
+        cost: response.cost,
+        rations: response.rations,
+        timestamp: new Date().toISOString(),
+      };
+      const existingFeeds = JSON.parse(localStorage.getItem('istock_feeds') || '[]');
+      existingFeeds.push(feedRecord);
+      localStorage.setItem('istock_feeds', JSON.stringify(existingFeeds));
+      success('Feed optimized successfully!');
     } catch (error) {
       console.error('Failed to optimize feed:', error);
-      // Error handling could be improved with toast notifications
+      // Error handling improved with toast notifications
     }
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white">
-      <div className="p-6 border-b bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-10">
+    <div className="h-full overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950">
+      <div className="p-6 border-b bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
             Feed Optimizer
@@ -111,6 +148,37 @@ export function FeedOptimizer() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <TargetAnimalSelect form={form} />
+
+                {/* Quick Add from Library */}
+                {savedIngredients.length > 0 && (
+                  <Card className="border-0 bg-primary/5 dark:bg-primary/10">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <BookOpen className="h-4 w-4 text-primary" />
+                        <Label className="font-semibold">Quick Add from Library</Label>
+                      </div>
+                      <Select
+                        onValueChange={(value) => {
+                          const ingredient = savedIngredients.find((ing) => ing.name === value);
+                          if (ingredient) {
+                            loadSavedIngredient(ingredient);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full md:w-[300px]">
+                          <SelectValue placeholder="Select a saved ingredient..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {savedIngredients.map((ing) => (
+                            <SelectItem key={ing.name} value={ing.name}>
+                              {ing.name} - ${ing.unitPrice.toFixed(2)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <IngredientList form={form} fieldArray={fieldArray} />
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type ControllerRenderProps } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SignUpSchema, type SignUpInput, type Role } from '@istock/shared';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 interface SignUpProps {
   onSwitchToSignIn: () => void;
@@ -64,15 +65,18 @@ export function SignUp({ onSwitchToSignIn, onSuccess }: SignUpProps) {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+    <Card className="w-full max-w-md mx-auto shadow-xl border bg-card/95 backdrop-blur-sm">
       <CardHeader className="space-y-3 pb-6">
-        <div className="space-y-1">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1 flex-1">
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
             Create Account
           </CardTitle>
           <CardDescription className="text-base">
             Join iStock and start managing your livestock
           </CardDescription>
+          </div>
+          <ThemeToggle />
         </div>
       </CardHeader>
       <Form {...form}>
@@ -87,7 +91,7 @@ export function SignUp({ onSwitchToSignIn, onSuccess }: SignUpProps) {
             <FormField
               control={form.control}
               name="email"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<SignUpInput, 'email'> }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
@@ -130,7 +134,7 @@ export function SignUp({ onSwitchToSignIn, onSuccess }: SignUpProps) {
             <FormField
               control={form.control}
               name="password"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<SignUpInput, 'password'> }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
@@ -144,7 +148,7 @@ export function SignUp({ onSwitchToSignIn, onSuccess }: SignUpProps) {
             <FormField
               control={form.control}
               name="confirmPassword"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<SignUpInput, 'confirmPassword'> }) => (
                 <FormItem>
                   <FormLabel>Confirm Password</FormLabel>
                   <FormControl>

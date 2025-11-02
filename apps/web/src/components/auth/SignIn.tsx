@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type ControllerRenderProps } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SignInSchema, type SignInInput } from '@istock/shared';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,7 +13,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Form,
   FormControl,
@@ -22,6 +21,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 interface SignInProps {
   onSwitchToSignUp: () => void;
@@ -56,15 +56,18 @@ export function SignIn({ onSwitchToSignUp, onSuccess }: SignInProps) {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+    <Card className="w-full max-w-md mx-auto shadow-xl border bg-card/95 backdrop-blur-sm">
       <CardHeader className="space-y-3 pb-6">
-        <div className="space-y-1">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1 flex-1">
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
             Welcome Back
           </CardTitle>
           <CardDescription className="text-base">
             Sign in to your iStock account
           </CardDescription>
+          </div>
+          <ThemeToggle />
         </div>
       </CardHeader>
       <Form {...form}>
@@ -79,7 +82,7 @@ export function SignIn({ onSwitchToSignUp, onSuccess }: SignInProps) {
             <FormField
               control={form.control}
               name="email"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<SignInInput, 'email'> }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
@@ -97,7 +100,7 @@ export function SignIn({ onSwitchToSignUp, onSuccess }: SignInProps) {
             <FormField
               control={form.control}
               name="password"
-              render={({ field }) => (
+              render={({ field }: { field: ControllerRenderProps<SignInInput, 'password'> }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>

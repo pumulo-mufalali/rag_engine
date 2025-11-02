@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Menu, X, LogOut, MessageSquare, Calculator } from 'lucide-react';
+import { Menu, X, LogOut, MessageSquare, Calculator, LayoutDashboard, FileText, BookOpen, Settings, Home } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -12,9 +13,11 @@ import {
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
+export type AppRoute = 'dashboard' | 'chatbot' | 'feed-optimizer' | 'health-records' | 'ingredients' | 'settings';
+
 interface AppLayoutProps {
-  currentRoute: 'chatbot' | 'feed-optimizer';
-  onRouteChange: (route: 'chatbot' | 'feed-optimizer') => void;
+  currentRoute: AppRoute;
+  onRouteChange: (route: AppRoute) => void;
   children: React.ReactNode;
 }
 
@@ -28,8 +31,13 @@ export function AppLayout({
 
   const navigationItems = [
     {
+      id: 'dashboard' as const,
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+    },
+    {
       id: 'chatbot' as const,
-      label: 'Health Chatbot',
+      label: 'Chat',
       icon: MessageSquare,
     },
     {
@@ -37,16 +45,31 @@ export function AppLayout({
       label: 'Feed Optimizer',
       icon: Calculator,
     },
+    {
+      id: 'health-records' as const,
+      label: 'Chat History',
+      icon: FileText,
+    },
+    {
+      id: 'ingredients' as const,
+      label: 'Ingredients',
+      icon: BookOpen,
+    },
+    {
+      id: 'settings' as const,
+      label: 'Settings',
+      icon: Settings,
+    },
   ];
 
-  const handleRouteChange = (route: 'chatbot' | 'feed-optimizer') => {
+  const handleRouteChange = (route: AppRoute) => {
     onRouteChange(route);
     setIsMobileMenuOpen(false);
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-gradient-to-b from-white to-gray-50/50">
-      <div className="p-6 border-b border-gray-200/80 bg-white">
+    <div className="flex flex-col h-full bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+      <div className="p-6 border-b border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-900">
         <div className="flex items-center gap-2 mb-1">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
             <span className="text-white font-bold text-lg">i</span>
@@ -69,7 +92,7 @@ export function AppLayout({
                 'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 relative group',
                 isActive
                   ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md shadow-primary/20'
-                  : 'text-muted-foreground hover:bg-gray-100 hover:text-foreground'
+                  : 'text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-foreground'
               )}
             >
               <Icon className={cn('h-5 w-5 transition-transform', isActive && 'scale-110')} />
@@ -83,14 +106,17 @@ export function AppLayout({
           );
         })}
       </nav>
-      <div className="p-4 border-t border-gray-200/80 bg-white">
-        <div className="mb-3 p-3 rounded-lg bg-gray-50/80">
+      <div className="p-4 border-t border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-900">
+        <div className="mb-3 p-3 rounded-lg bg-gray-50/80 dark:bg-gray-800/80">
           <p className="text-sm font-semibold text-foreground truncate">{user?.email}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{user?.role}</p>
         </div>
+        <div className="mb-2">
+          <ThemeToggle />
+        </div>
         <Button
           variant="outline"
-          className="w-full hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
+          className="w-full hover:bg-red-50 hover:border-red-200 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:border-red-800 transition-colors"
           onClick={logout}
         >
           <LogOut className="h-4 w-4 mr-2" />
@@ -108,7 +134,7 @@ export function AppLayout({
       </aside>
 
       {/* Mobile Menu Sheet */}
-      <div className="md:hidden fixed top-0 left-0 z-50 w-full border-b bg-white/95 backdrop-blur-sm shadow-sm">
+      <div className="md:hidden fixed top-0 left-0 z-50 w-full border-b bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-sm">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">

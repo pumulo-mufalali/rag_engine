@@ -1,260 +1,300 @@
-<!-- cc08825a-5d71-409a-8498-505df2f7a065 4f35dd36-f072-4779-9eed-ba396670cb37 -->
-# iStock Frontend Development Plan
+<!-- cc08825a-5d71-409a-8498-505df2f7a065 d8334341-7991-4eaf-9a03-9274eac7b877 -->
+# Enhanced Features & Theme System Implementation Plan
 
-## Phase 1: Monorepo Setup & Foundation
+## Phase 1: Theme System (Dark/Light Mode)
 
-### 1.1 Initialize Monorepo Structure
+### 1.1 Theme Context & Provider
 
-- Create directory structure per TDD: `apps/web`, `packages/shared`, `functions/`, `docs/`
-- Set up root `package.json` with pnpm workspace configuration
-- Create `pnpm-workspace.yaml` for monorepo management
-- Add root-level configuration files (`.gitignore`, `.editorconfig`, etc.)
+- Create `apps/web/src/contexts/ThemeContext.tsx`:
+  - Theme state management ('light' | 'dark' | 'system')
+  - localStorage persistence for theme preference
+  - System preference detection
+  - Theme toggle functions
+  - Provide theme state and controls to components
 
-### 1.2 Setup packages/shared
+### 1.2 Theme Toggle Component
 
-- Create `packages/shared/package.json` with Zod as dependency
-- Implement Zod schemas:
-- `FeedIngredientSchema` (name, unitPrice, nutritionalValues)
-- `RagResponseSchema` (text, sources array, confidence)
-- `FeedRationSchema` (cost, rations array)
-- `HealthRecordSchema`
-- Auth schemas (email, password, role)
-- Export all schemas and TypeScript types from index
+- Create `apps/web/src/components/theme/ThemeToggle.tsx`:
+  - Button/dropdown to switch between light, dark, and system themes
+  - Use lucide-react icons (Sun, Moon, Monitor)
+  - Smooth theme transitions
+  - Integrate into AppLayout header/sidebar
 
-### 1.3 Setup apps/web - Base Configuration
+### 1.3 Dark Mode Styling
 
-- Initialize React 18 + Vite project in `apps/web`
-- Configure `vite.config.ts` with React plugin and path aliases
-- Set up TypeScript with strict mode in `tsconfig.json`
-- Configure Tailwind CSS with Inter font
-- Install and configure shadcn/ui with Tailwind
-- Set up Tailwind config with Inter font family
+- Update `apps/web/src/index.css`:
+  - Enhance dark mode CSS variables
+  - Ensure all components work in both themes
+  - Test color contrast and readability
+  - Smooth transitions between themes
 
-## Phase 2: Core Dependencies & Infrastructure
+## Phase 2: Dashboard/Home Page
 
-### 2.1 Install Required Dependencies
+### 2.1 Dashboard Layout
 
-- React 18, React DOM
-- Vite and plugins
-- Tailwind CSS, PostCSS, Autoprefixer
-- shadcn/ui base dependencies (Radix UI primitives)
-- tRPC client (@trpc/client, @trpc/react-query)
-- TanStack Query (@tanstack/react-query)
-- React Hook Form (@hookform/resolvers, react-hook-form)
-- Zod (from workspace)
-- React Router (for navigation - using simple if/else as specified)
+- Create `apps/web/src/pages/Dashboard.tsx`:
+  - Overview cards with key metrics
+  - Recent activity feed
+  - Quick action buttons
+  - Statistics cards (total chats, feed optimizations, etc.)
 
-### 2.2 Configure tRPC Client
+### 2.2 Dashboard Components
 
-- Create `apps/web/src/lib/trpc.ts` with tRPC client setup
-- Create mock tRPC procedures:
-- `health.askRag` mutation (returns mock RagResponse)
-- `nutrition.optimizeFeed` mutation (returns mock FeedRation)
-- Mock delay/simulation for realistic API behavior
-- Set up TanStack Query provider integration
-- Create typed hooks (`useTRPC`, `useMutation` wrappers)
+- Create `apps/web/src/components/dashboard/StatsCard.tsx`:
+  - Reusable stat card with icon, value, label
+  - Trend indicators (up/down arrows)
+  - Gradient backgrounds and modern styling
 
-### 2.3 Setup shadcn/ui Components
+- Create `apps/web/src/components/dashboard/ActivityFeed.tsx`:
+  - Recent chatbot queries
+  - Recent feed optimizations
+  - Clickable items to navigate to details
+  - Empty state when no activity
 
-- Initialize shadcn/ui config (`components.json`)
-- Install core components needed:
-- Card, Input, Textarea, Button
-- Table, Sheet/Sidebar (for mobile nav)
-- Select/Combobox components
-- Form components (Label, Form wrapper)
+- Create `apps/web/src/components/dashboard/QuickActions.tsx`:
+  - Quick links to main features
+  - Large, prominent buttons
+  - Modern card-based layout
 
-## Phase 3: Authentication System
+## Phase 3: Health Records Management
 
-### 3.1 Auth Context & State Management
+### 3.1 Health Records Page
 
-- Create `apps/web/src/contexts/AuthContext.tsx`:
-- useState/useEffect for auth state
-- localStorage persistence (user, role, auth status)
-- Login/logout functions
-- Mock authentication logic (simulates successful login)
-- Create `apps/web/src/hooks/useAuth.ts` hook wrapper
+- Create `apps/web/src/pages/HealthRecords.tsx`:
+  - List of saved health records/chat history
+  - Search and filter functionality
+  - Date range filtering
+  - Export to PDF/CSV functionality
+  - Delete/edit records
 
-### 3.2 Auth UI Components
+### 3.2 Health Record Components
 
-- Create `apps/web/src/components/auth/SignIn.tsx`:
-- shadcn/ui Card layout
-- React Hook Form + Zod validation
-- Email and password inputs
-- Form submission handler
-- Create `apps/web/src/components/auth/SignUp.tsx` (similar structure)
-- Create shared auth form validation schemas
+- Create `apps/web/src/components/health/HealthRecordCard.tsx`:
+  - Display individual health record
+  - Show diagnosis, date, animal type
+  - Expandable details view
+  - Action buttons (view, edit, delete)
 
-### 3.3 Protected Route Logic
+- Create `apps/web/src/components/health/HealthRecordModal.tsx`:
+  - Detailed view of health record
+  - Full chat history
+  - Sources and citations
+  - Export functionality
 
-- Create `apps/web/src/components/auth/ProtectedRoute.tsx` wrapper
-- Implement route gating logic (redirect to sign-in if not authenticated)
+- Create `apps/web/src/components/health/SearchBar.tsx`:
+  - Search by keywords
+  - Filter by date, animal type, diagnosis
+  - Real-time search results
 
-## Phase 4: Main Application Layout
+## Phase 4: Ingredient Library
 
-### 4.1 Root Layout Component
+### 4.1 Ingredient Library Page
 
-- Create `apps/web/src/components/layout/AppLayout.tsx`:
-- Responsive sidebar/navigation using shadcn/ui Sheet for mobile
-- Desktop sidebar with navigation links
-- Mobile hamburger menu (Sheet component)
-- Header with user info and logout
+- Create `apps/web/src/pages/IngredientLibrary.tsx`:
+  - Saved ingredients list
+  - Add/edit/delete ingredients
+  - Categories/tags for ingredients
+  - Import/export ingredient lists
+  - Search and filter saved ingredients
 
-### 4.2 Navigation System
+### 4.2 Ingredient Library Components
 
-- Implement client-side routing (simple if/else/switch in App.tsx)
-- Route states: 'chatbot' | 'feed-optimizer'
-- Navigation component with active state indicators
-- Mobile-responsive navigation drawer
+- Create `apps/web/src/components/ingredients/IngredientCard.tsx`:
+  - Display ingredient details (name, price, nutrition)
+  - Quick actions (use, edit, delete)
+  - Visual nutrition indicators
 
-## Phase 5: Health Chatbot Feature
+- Create `apps/web/src/components/ingredients/IngredientForm.tsx`:
+  - Reusable form for adding/editing ingredients
+  - Validation with Zod
+  - Save to library functionality
 
-### 5.1 Chatbot UI Components
+- Create `apps/web/src/components/ingredients/IngredientSelector.tsx`:
+  - Multi-select component for choosing saved ingredients
+  - Quick add to feed optimizer
+  - Categories/tags filtering
 
-- Create `apps/web/src/components/chatbot/ChatInterface.tsx`:
-- Chat message list container
-- Message bubble components (user query vs AI response)
-- Loading state indicators
-- Scrollable message history
-- Create `apps/web/src/components/chatbot/MessageBubble.tsx`:
-- User message styling (right-aligned)
-- AI response styling (left-aligned)
-- Source citations display (footnotes or "Sources Used" block)
-- Confidence score display
+## Phase 5: Settings Page
 
-### 5.2 Chatbot Logic
+### 5.1 Settings Page
 
-- Create `apps/web/src/pages/Chatbot.tsx`:
-- useState for chat history array
-- React Hook Form for query input (Textarea)
-- tRPC mutation hook integration (`health.askRag`)
-- Form submission handler
-- Error handling and display
-- Integrate TanStack Query mutation for API calls
-- Format and display RagResponse with sources and confidence
+- Create `apps/web/src/pages/Settings.tsx`:
+  - Profile settings (email, role, preferences)
+  - Theme settings (light/dark/system)
+  - Notification preferences
+  - Data management (export, clear history)
+  - About/help section
 
-## Phase 6: Feed Optimizer Feature
+### 5.2 Settings Components
 
-### 6.1 Feed Optimizer Form
+- Create `apps/web/src/components/settings/SettingsSection.tsx`:
+  - Reusable settings section wrapper
+  - Consistent styling and layout
 
-- Create `apps/web/src/components/feed/TargetAnimalSelect.tsx`:
-- Radio/Select component for animal type
-- Options: 'Dairy Cattle', 'Beef Cattle', 'Calf'
-- Create `apps/web/src/components/feed/IngredientForm.tsx`:
-- Individual ingredient input fields
-- Name, unitPrice (number input)
-- Nutritional values (simplified: Protein %, Energy Mcal/kg inputs)
-- Create `apps/web/src/components/feed/IngredientList.tsx`:
-- Dynamic ingredient list using React Hook Form's `useFieldArray`
-- Add/remove ingredient buttons
-- Validation per ingredient entry
+- Create `apps/web/src/components/settings/ProfileSettings.tsx`:
+  - Edit user profile
+  - Change password (if needed)
+  - Account preferences
 
-### 6.2 Feed Optimizer Logic
+- Create `apps/web/src/components/settings/DataManagement.tsx`:
+  - Export all data option
+  - Clear chat history
+  - Clear saved ingredients
+  - Export feed optimization history
 
-- Create `apps/web/src/pages/FeedOptimizer.tsx`:
-- React Hook Form setup with Zod schema validation
-- Form with targetAnimal and ingredients array
-- Integration with tRPC mutation (`nutrition.optimizeFeed`)
-- Form submission and error handling
+## Phase 6: Enhanced Features
 
-### 6.3 Results Display
+### 6.1 Export Functionality
 
-- Create `apps/web/src/components/feed/FeedResults.tsx`:
-- shadcn/ui Table component
-- Display FeedRation.rations array (ingredient percentages)
-- Prominent total cost display
-- Clean, professional table styling
+- Create `apps/web/src/lib/export.ts`:
+  - Export chat history to PDF
+  - Export feed results to CSV/PDF
+  - Export ingredient library
+  - Utility functions for data formatting
 
-## Phase 7: Main App Entry & Routing
+- Add export buttons to relevant pages:
+  - Chatbot: Export conversation
+  - Feed Optimizer: Export results
+  - Health Records: Bulk export
 
-### 7.1 App.tsx Main Component
+### 6.2 Notifications System
 
-- Create `apps/web/src/App.tsx`:
-- Simple if/else routing logic (no external router)
-- Route states: 'sign-in' | 'sign-up' | 'chatbot' | 'feed-optimizer'
-- Auth check and routing decision
-- Conditional rendering of components
+- Create `apps/web/src/contexts/NotificationContext.tsx`:
+  - Toast notification system
+  - Success, error, warning, info types
+  - Auto-dismiss functionality
+  - Notification history
 
-### 7.2 Main Entry Point
+- Create `apps/web/src/components/ui/toast.tsx` (shadcn/ui):
+  - Toast component for notifications
+  - Position options (top-right, bottom-right)
+  - Animations
 
-- Create/update `apps/web/src/main.tsx`:
-- React 18 createRoot setup
-- TanStack Query QueryClient and Provider
-- tRPC Provider wrapper
-- AuthContext Provider
-- App component mounting
+### 6.3 Search & Filter Enhancements
 
-### 7.3 Global Styles
+- Global search component
+- Search across all records
+- Advanced filtering options
+- Saved search filters
 
-- Create `apps/web/src/index.css`:
-- Tailwind directives
-- Inter font import
-- Global base styles
-- Custom CSS variables for theming (shadcn/ui)
+### 6.4 Statistics & Analytics
 
-## Phase 8: Styling & Responsiveness
+- Create `apps/web/src/components/analytics/Chart.tsx`:
+  - Simple chart component for feed cost trends
+  - Usage statistics visualization
+  - Activity graphs
 
-### 8.1 Mobile Responsiveness
+- Add analytics to dashboard:
+  - Feed cost trends over time
+  - Chat usage patterns
+  - Most common health queries
 
-- Ensure all components are mobile-first
-- Test and adjust sidebar navigation for mobile (Sheet component)
-- Responsive tables for feed results
-- Mobile-friendly chat interface
-- Responsive form layouts
+## Phase 7: UI/UX Enhancements
 
-### 8.2 Design Polish
+### 7.1 Loading States
 
-- Apply rounded corners and shadows per requirements
-- Consistent spacing and typography
-- Ensure Inter font is applied globally
-- Professional color scheme
-- Loading states and transitions
+- Create skeleton loaders for all pages
+- Improve loading indicators
+- Smooth transitions between states
 
-## Phase 9: Final Integration & Testing
+### 7.2 Empty States
 
-### 9.1 Integration Checks
+- Create EmptyState component
+- Add helpful messages and actions
+- Illustrations/icons for empty states
 
-- Verify all imports and dependencies
-- Test authentication flow (sign-in → main app)
-- Test navigation between chatbot and feed optimizer
-- Verify tRPC mock procedures are working
-- Check localStorage persistence
+### 7.3 Tooltips & Help
 
-### 9.2 File Structure Validation
+- Add tooltips to complex features
+- Help icons with explanations
+- Keyboard shortcuts display
 
-- Verify monorepo structure matches TDD
-- Ensure proper exports and imports
-- Check TypeScript types are properly defined
-- Validate all Zod schemas are in packages/shared
+### 7.4 Responsive Improvements
 
-## Deliverables Checklist
+- Enhanced mobile experience
+- Tablet-optimized layouts
+- Better touch targets
 
-- [ ] Complete monorepo structure (`apps/web`, `packages/shared`)
-- [ ] All Zod schemas in `packages/shared`
-- [ ] tRPC client setup with mock procedures
-- [ ] Authentication system with localStorage
-- [ ] Responsive app layout with navigation
-- [ ] Health Chatbot with source citations display
-- [ ] Feed Optimizer with dynamic ingredient inputs
-- [ ] Client-side routing (if/else, no router library)
-- [ ] Mobile-responsive design throughout
-- [ ] Inter font and professional styling
+## Phase 8: Integration & Polish
+
+### 8.1 Navigation Updates
+
+- Add new routes to AppLayout navigation
+- Update routing in App.tsx
+- Add icons for new pages
+- Update active state handling
+
+### 8.2 Data Persistence
+
+- Enhance localStorage management
+- Add data versioning
+- Migration utilities for future updates
+
+### 8.3 Error Handling
+
+- Global error boundary
+- Better error messages
+- Error recovery suggestions
+
+### 8.4 Performance
+
+- Optimize re-renders
+- Lazy loading for heavy components
+- Code splitting considerations
+
+## New Routes to Add
+
+- `dashboard` - Home/Overview page
+- `health-records` - Health records management
+- `ingredients` - Ingredient library
+- `settings` - Settings and preferences
+
+## Components to Create
+
+1. ThemeContext & ThemeToggle
+2. Dashboard page and components
+3. HealthRecords page and components
+4. IngredientLibrary page and components
+5. Settings page and components
+6. Toast/Notification system
+7. Export utilities
+8. Analytics/Chart components
+9. Empty states and loading skeletons
+
+## Files Structure
+
+```
+apps/web/src/
+  ├── contexts/
+  │   ├── ThemeContext.tsx (new)
+  │   └── NotificationContext.tsx (new)
+  ├── pages/
+  │   ├── Dashboard.tsx (new)
+  │   ├── HealthRecords.tsx (new)
+  │   ├── IngredientLibrary.tsx (new)
+  │   └── Settings.tsx (new)
+  ├── components/
+  │   ├── theme/ (new)
+  │   ├── dashboard/ (new)
+  │   ├── health/ (new)
+  │   ├── ingredients/ (new)
+  │   ├── settings/ (new)
+  │   ├── analytics/ (new)
+  │   └── ui/
+  │       └── toast.tsx (new)
+  └── lib/
+      └── export.ts (new)
+```
 
 ### To-dos
 
-- [ ] Create monorepo structure (apps/web, packages/shared, functions, docs) with pnpm workspace configuration
-- [ ] Create packages/shared with Zod schemas (FeedIngredient, RagResponse, FeedRation, HealthRecord, Auth schemas)
-- [ ] Initialize React 18 + Vite project in apps/web with TypeScript strict mode and path aliases
-- [ ] Configure Tailwind CSS with Inter font and initialize shadcn/ui with required components (Card, Input, Textarea, Button, Table, Sheet, Form)
-- [ ] Install all dependencies (TanStack Query, React Hook Form, Zod resolver, tRPC client libraries)
-- [ ] Create tRPC client setup with mock procedures (health.askRag, nutrition.optimizeFeed) integrated with TanStack Query
-- [ ] Create AuthContext with localStorage persistence, login/logout functions, and useAuth hook
-- [ ] Build SignIn and SignUp components with React Hook Form + Zod validation using shadcn/ui Card and Input
-- [ ] Build responsive AppLayout with sidebar navigation (Sheet for mobile, sidebar for desktop) and user header
-- [ ] Create App.tsx with simple if/else routing logic (no router library) for sign-in, chatbot, feed-optimizer routes
-- [ ] Create ChatInterface and MessageBubble components with chat history, loading states, and source citations display
-- [ ] Build Chatbot page with React Hook Form input, tRPC mutation integration, and RagResponse display with sources and confidence
-- [ ] Create TargetAnimalSelect, IngredientForm, and IngredientList components with useFieldArray for dynamic ingredients
-- [ ] Build FeedOptimizer page with React Hook Form + Zod validation and tRPC mutation integration
-- [ ] Build FeedResults component with shadcn/ui Table showing ration percentages and total cost
-- [ ] Create main.tsx with React 18 createRoot, TanStack Query Provider, tRPC Provider, and AuthContext Provider
-- [ ] Apply Inter font globally, ensure mobile responsiveness, add rounded corners/shadows, and polish all components
+- [ ] Create ThemeContext with dark/light/system modes, localStorage persistence, and theme toggle component
+- [ ] Build Dashboard page with stats cards, activity feed, and quick actions
+- [ ] Create HealthRecords page with search, filter, and export functionality
+- [ ] Build IngredientLibrary page with save/edit/delete ingredients and categories
+- [ ] Create Settings page with profile, theme, notifications, and data management options
+- [ ] Implement export utilities for PDF/CSV generation for chats, feed results, and records
+- [ ] Create NotificationContext and toast components for user feedback
+- [ ] Add analytics components with charts for feed costs, usage statistics, and trends
+- [ ] Update AppLayout and App.tsx to include new routes (dashboard, health-records, ingredients, settings)
+- [ ] Add loading skeletons, empty states, tooltips, and improve responsive design
