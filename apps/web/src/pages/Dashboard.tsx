@@ -5,12 +5,16 @@ import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { Card, CardContent } from '@/components/ui/card';
 import type { AppRoute } from '@/components/layout/AppLayout';
+import { useAuth } from '@/hooks/useAuth';
+import { getChatHistory } from '@/lib/firestore-services';
+import { getFeedOptimizations } from '@/lib/firestore-services';
 
 interface DashboardProps {
   onNavigate: (route: AppRoute) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalChats: 0,
     totalOptimizations: 0,
@@ -19,41 +23,59 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   });
 
   const [activities, setActivities] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load stats from localStorage
-    const chats = JSON.parse(localStorage.getItem('istock_chats') || '[]');
-    const feeds = JSON.parse(localStorage.getItem('istock_feeds') || '[]');
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
 
-    setStats({
-      totalChats: chats.length,
-      totalOptimizations: feeds.length,
-      avgFeedCost: feeds.length > 0
-        ? feeds.reduce((sum: number, f: any) => sum + (f.cost || 0), 0) / feeds.length
-        : 0,
-      savedCost: feeds.length * 15, // Mock savings calculation
-    });
+    const loadDashboardData = async () => {
+      setIsLoading(true);
+      try {
+        const [chats, feeds] = await Promise.all([
+          getChatHistory(user.id),
+          getFeedOptimizations(user.id),
+        ]);
 
-    // Create activity feed
-    const allActivities = [
-      ...chats.slice(-5).map((chat: any) => ({
-        id: `chat-${chat.id || Date.now()}`,
-        type: 'chat' as const,
-        title: chat.query || 'Health query',
-        timestamp: new Date(chat.timestamp || Date.now()),
-        description: 'Chat conversation',
-      })),
-      ...feeds.slice(-5).map((feed: any) => ({
-        id: `feed-${feed.id || Date.now()}`,
-        type: 'feed' as const,
-        title: `Feed optimization for ${feed.targetAnimal || 'Animal'}`,
-        timestamp: new Date(feed.timestamp || Date.now()),
-        description: `Cost: $${feed.cost?.toFixed(2) || '0.00'}`,
-      })),
-    ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 5);
+        setStats({
+          totalChats: chats.length,
+          totalOptimizations: feeds.length,
+          avgFeedCost: feeds.length > 0
+            ? feeds.reduce((sum: number, f) => sum + (f.cost || 0), 0) / feeds.length
+            : 0,
+          savedCost: feeds.length * 15, // Estimated savings calculation
+        });
 
-    setActivities(allActivities);
-  }, []);
+        // Create activity feed
+        const allActivities = [
+          ...chats.slice(-5).map((chat) => ({
+            id: `chat-${chat.id}`,
+            type: 'chat' as const,
+            title: chat.query || 'Health query',
+            timestamp: chat.timestamp instanceof Date ? chat.timestamp : new Date(chat.timestamp),
+            description: 'Chat conversation',
+          })),
+          ...feeds.slice(-5).map((feed) => ({
+            id: `feed-${feed.id}`,
+            type: 'feed' as const,
+            title: `Feed optimization for ${feed.targetAnimal || 'Animal'}`,
+            timestamp: feed.timestamp instanceof Date ? feed.timestamp : new Date(feed.timestamp),
+            description: `Cost: $${feed.cost?.toFixed(2) || '0.00'}`,
+          })),
+        ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 5);
+
+        setActivities(allActivities);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [user?.id]);
 
   return (
     <div className="h-full overflow-y-auto chat-scrollbar">
@@ -87,16 +109,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 Get started by asking a health question or optimizing your feed costs. 
                 Your activity and insights will appear here.
               </p>
-              <div className="flex flex-wrap gap-3 justify-center mt-6">
+              <div className="flex flex-wrap gap-3 justify-center mt-6" role="group" aria-label="Quick actions">
                 <button
                   onClick={() => onNavigate('chatbot')}
-                  className="px-6 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+                  className="px-6 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  aria-label="Navigate to Chat page to ask health questions"
                 >
                   Ask Health Question
                 </button>
                 <button
                   onClick={() => onNavigate('feed-optimizer')}
-                  className="px-6 py-3 rounded-xl bg-background border-2 border-primary/20 hover:border-primary/40 text-foreground font-medium shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95"
+                  className="px-6 py-3 rounded-xl bg-background border-2 border-primary/20 hover:border-primary/40 text-foreground font-medium shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  aria-label="Navigate to Feed Optimizer page"
                 >
                   Optimize Feed Costs
                 </button>
@@ -107,7 +131,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <section aria-label="Statistics overview">
+          <h2 className="sr-only">Statistics Overview</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6" role="list">
           <StatsCard
             title="Total Chats"
             value={stats.totalChats}
@@ -140,7 +166,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             trend={{ value: 15, isPositive: true }}
             gradient="from-orange-500/10 to-orange-500/5"
           />
-        </div>
+          </div>
+        </section>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

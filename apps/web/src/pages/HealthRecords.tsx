@@ -4,6 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow } from '@/lib/date-utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import {
+  getChatHistory,
+  updateChat,
+  deleteChat as deleteChatFromFirestore,
+} from '@/lib/firestore-services';
 
 interface HealthRecord {
   id: string;
@@ -17,24 +24,48 @@ interface HealthRecord {
 }
 
 export function HealthRecords() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [records, setRecords] = useState<HealthRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredRecords, setFilteredRecords] = useState<HealthRecord[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Load records from localStorage
-    const storedRecords = JSON.parse(localStorage.getItem('istock_chats') || '[]');
-    const parsedRecords = storedRecords.map((r: any) => ({
-      ...r,
-      timestamp: new Date(r.timestamp || r.date || Date.now()),
-      title: r.title || r.query?.substring(0, 50) || 'Untitled Chat',
-    }));
-    setRecords(parsedRecords.sort((a: HealthRecord, b: HealthRecord) => 
-      b.timestamp.getTime() - a.timestamp.getTime()
-    ));
-  }, []);
+    if (!user?.id) return;
+
+    const loadRecords = async () => {
+      setIsLoading(true);
+      try {
+        const chats = await getChatHistory(user.id);
+        const parsedRecords = chats.map((r) => ({
+          id: r.id,
+          title: r.title || r.query?.substring(0, 50) || 'Untitled Chat',
+          query: r.query,
+          response: r.response,
+          sources: r.sources,
+          confidence: r.confidence,
+          timestamp: r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp),
+        }));
+        setRecords(parsedRecords.sort((a: HealthRecord, b: HealthRecord) => 
+          b.timestamp.getTime() - a.timestamp.getTime()
+        ));
+      } catch (error) {
+        console.error('Failed to load health records:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load health records',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadRecords();
+  }, [user?.id, toast]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -59,23 +90,33 @@ export function HealthRecords() {
     setEditTitle(record.title || record.query.substring(0, 50) || 'Untitled Chat');
   };
 
-  const saveRename = () => {
-    if (!editingId) return;
+  const saveRename = async () => {
+    if (!editingId || !user?.id) return;
     
-    const updated = records.map((r) =>
-      r.id === editingId ? { ...r, title: editTitle || r.query.substring(0, 50) || 'Untitled Chat' } : r
-    );
-    setRecords(updated);
-    
-    // Update localStorage
-    const stored = JSON.parse(localStorage.getItem('istock_chats') || '[]');
-    const updatedStored = stored.map((r: any) =>
-      r.id === editingId ? { ...r, title: editTitle || r.query?.substring(0, 50) || 'Untitled Chat' } : r
-    );
-    localStorage.setItem('istock_chats', JSON.stringify(updatedStored));
-    
-    setEditingId(null);
-    setEditTitle('');
+    try {
+      await updateChat(user.id, editingId, {
+        title: editTitle || records.find((r) => r.id === editingId)?.query.substring(0, 50) || 'Untitled Chat',
+      });
+      
+      const updated = records.map((r) =>
+        r.id === editingId ? { ...r, title: editTitle || r.query.substring(0, 50) || 'Untitled Chat' } : r
+      );
+      setRecords(updated);
+      setEditingId(null);
+      setEditTitle('');
+      
+      toast({
+        title: 'Success',
+        description: 'Record title updated',
+      });
+    } catch (error) {
+      console.error('Failed to update record:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update record',
+        variant: 'destructive',
+      });
+    }
   };
 
   const cancelRename = () => {
@@ -83,16 +124,26 @@ export function HealthRecords() {
     setEditTitle('');
   };
 
-  const deleteRecord = (id: string) => {
-    if (!confirm('Are you sure you want to delete this chat?')) return;
+  const deleteRecord = async (id: string) => {
+    if (!user?.id || !confirm('Are you sure you want to delete this record?')) return;
     
-    const updated = records.filter((r) => r.id !== id);
-    setRecords(updated);
-    
-    // Update localStorage
-    const stored = JSON.parse(localStorage.getItem('istock_chats') || '[]');
-    const updatedStored = stored.filter((r: any) => r.id !== id);
-    localStorage.setItem('istock_chats', JSON.stringify(updatedStored));
+    try {
+      await deleteChatFromFirestore(user.id, id);
+      const updated = records.filter((r) => r.id !== id);
+      setRecords(updated);
+      
+      toast({
+        title: 'Success',
+        description: 'Record deleted',
+      });
+    } catch (error) {
+      console.error('Failed to delete record:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete record',
+        variant: 'destructive',
+      });
+    }
   };
 
   const exportRecord = (record: HealthRecord) => {

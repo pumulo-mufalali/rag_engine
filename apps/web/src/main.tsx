@@ -5,8 +5,16 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
+import { validateEnv } from '@/lib/env';
+// Initialize Firebase (import side effects)
+import '@/lib/firebase';
 import App from './App.tsx';
 import './index.css';
+
+// Validate environment variables on app start
+if (import.meta.env.DEV) {
+  validateEnv();
+}
 
 // Create React Query client
 const queryClient = new QueryClient({

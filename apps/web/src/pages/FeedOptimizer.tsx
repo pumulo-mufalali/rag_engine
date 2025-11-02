@@ -20,6 +20,9 @@ import { Loader2, BookOpen } from 'lucide-react';
 import type { FeedRation, FeedIngredient } from '@istock/shared';
 import { useNotification } from '@/contexts/NotificationContext';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/hooks/useAuth';
+import { getIngredients } from '@/lib/firestore-services';
+import { saveFeedOptimization } from '@/lib/firestore-services';
 
 const feedOptimizerSchema = z.object({
   targetAnimal: z.enum(['Dairy Cattle', 'Beef Cattle', 'Calf']),
@@ -42,16 +45,32 @@ const feedOptimizerSchema = z.object({
 type FeedOptimizerForm = z.infer<typeof feedOptimizerSchema>;
 
 export function FeedOptimizer() {
+  const { user } = useAuth();
   const [result, setResult] = useState<FeedRation | null>(null);
   const [savedIngredients, setSavedIngredients] = useState<FeedIngredient[]>([]);
   const optimizeFeed = useOptimizeFeed();
   const { success } = useNotification();
 
   useEffect(() => {
-    // Load saved ingredients from localStorage
-    const stored = JSON.parse(localStorage.getItem('istock_ingredients') || '[]');
-    setSavedIngredients(stored);
-  }, []);
+    if (!user?.id) return;
+
+    const loadIngredients = async () => {
+      try {
+        const ingredientsList = await getIngredients(user.id);
+        // Convert Firestore ingredient format to FeedIngredient format
+        const converted = ingredientsList.map((ing) => ({
+          name: ing.name,
+          unitPrice: ing.unitPrice,
+          nutritionalValues: ing.nutritionalValues,
+        }));
+        setSavedIngredients(converted);
+      } catch (error) {
+        console.error('Failed to load ingredients:', error);
+      }
+    };
+
+    loadIngredients();
+  }, [user?.id]);
 
   const form = useForm<FeedOptimizerForm>({
     resolver: zodResolver(feedOptimizerSchema),
@@ -107,17 +126,22 @@ export function FeedOptimizer() {
 
       setResult(response);
 
-      // Save to localStorage for dashboard
-      const feedRecord = {
-        id: `feed-${Date.now()}`,
-        targetAnimal: data.targetAnimal,
-        cost: response.cost,
-        rations: response.rations,
-        timestamp: new Date().toISOString(),
-      };
-      const existingFeeds = JSON.parse(localStorage.getItem('istock_feeds') || '[]');
-      existingFeeds.push(feedRecord);
-      localStorage.setItem('istock_feeds', JSON.stringify(existingFeeds));
+      // Save to Firestore
+      if (user?.id) {
+        try {
+          await saveFeedOptimization(user.id, {
+            id: `feed-${Date.now()}`,
+            targetAnimal: data.targetAnimal,
+            cost: response.cost,
+            rations: response.rations,
+            timestamp: new Date(),
+          });
+        } catch (error) {
+          console.error('Failed to save feed optimization:', error);
+          // Don't block the user, just log the error
+        }
+      }
+      
       success('Feed optimized successfully!');
     } catch (error) {
       console.error('Failed to optimize feed:', error);

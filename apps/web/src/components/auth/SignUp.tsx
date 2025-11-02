@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, type ControllerRenderProps } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { SignUpSchema, type SignUpInput, type Role } from '@istock/shared';
+import { SignUpSchema, type SignUpInput } from '@istock/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,13 +21,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 interface SignUpProps {
@@ -46,7 +39,6 @@ export function SignUp({ onSwitchToSignIn, onSuccess }: SignUpProps) {
       email: '',
       password: '',
       confirmPassword: '',
-      role: 'Farmer',
     },
   });
 
@@ -55,7 +47,8 @@ export function SignUp({ onSwitchToSignIn, onSuccess }: SignUpProps) {
     setError(null);
 
     try {
-      await signup(data.email, data.password, data.role);
+      // Always use 'Farmer' role for all accounts (handled automatically in AuthContext)
+      await signup(data.email, data.password);
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign up');
@@ -101,31 +94,6 @@ export function SignUp({ onSwitchToSignIn, onSuccess }: SignUpProps) {
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select
-                    onValueChange={(value: Role) => field.onChange(value)}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Farmer">Farmer</SelectItem>
-                      <SelectItem value="Vet">Vet/Consultant</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

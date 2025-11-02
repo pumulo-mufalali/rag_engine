@@ -12,54 +12,128 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Sun, Moon, Monitor, Trash2, Download, User, Database } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  getChatHistory,
+  getFeedOptimizations,
+  getIngredients,
+  deleteDocument,
+} from '@/lib/firestore-services';
 
 export function Settings() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
 
-  const exportAllData = () => {
-    const chats = JSON.parse(localStorage.getItem('istock_chats') || '[]');
-    const feeds = JSON.parse(localStorage.getItem('istock_feeds') || '[]');
-    const ingredients = JSON.parse(localStorage.getItem('istock_ingredients') || '[]');
+  const exportAllData = async () => {
+    if (!user?.id) return;
 
-    const data = {
-      exportDate: new Date().toISOString(),
-      user: user,
-      chats,
-      feeds,
-      ingredients,
-    };
+    try {
+      const [chats, feeds, ingredients] = await Promise.all([
+        getChatHistory(user.id),
+        getFeedOptimizations(user.id),
+        getIngredients(user.id),
+      ]);
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `istock-export-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+      const data = {
+        exportDate: new Date().toISOString(),
+        user: user,
+        chats,
+        feeds,
+        ingredients,
+      };
 
-  const clearChatHistory = () => {
-    if (confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) {
-      localStorage.removeItem('istock_chats');
-      alert('Chat history cleared successfully');
-      window.location.reload();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `istock-export-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Success',
+        description: 'Data exported successfully',
+      });
+    } catch (error) {
+      console.error('Failed to export data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to export data',
+        variant: 'destructive',
+      });
     }
   };
 
-  const clearFeedHistory = () => {
-    if (confirm('Are you sure you want to clear all feed optimization history? This action cannot be undone.')) {
-      localStorage.removeItem('istock_feeds');
-      alert('Feed history cleared successfully');
+  const clearChatHistory = async () => {
+    if (!user?.id || !confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const chats = await getChatHistory(user.id);
+      await Promise.all(chats.map((chat) => deleteDocument('chats', chat.id)));
+      
+      toast({
+        title: 'Success',
+        description: 'Chat history cleared successfully',
+      });
       window.location.reload();
+    } catch (error) {
+      console.error('Failed to clear chat history:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to clear chat history',
+        variant: 'destructive',
+      });
     }
   };
 
-  const clearIngredients = () => {
-    if (confirm('Are you sure you want to clear all saved ingredients? This action cannot be undone.')) {
-      localStorage.removeItem('istock_ingredients');
-      alert('Ingredients cleared successfully');
+  const clearFeedHistory = async () => {
+    if (!user?.id || !confirm('Are you sure you want to clear all feed optimization history? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const feeds = await getFeedOptimizations(user.id);
+      await Promise.all(feeds.map((feed) => deleteDocument('feedOptimizations', feed.id)));
+      
+      toast({
+        title: 'Success',
+        description: 'Feed history cleared successfully',
+      });
       window.location.reload();
+    } catch (error) {
+      console.error('Failed to clear feed history:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to clear feed history',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const clearIngredients = async () => {
+    if (!user?.id || !confirm('Are you sure you want to clear all saved ingredients? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const ingredients = await getIngredients(user.id);
+      await Promise.all(ingredients.map((ing) => deleteDocument('ingredients', ing.id)));
+      
+      toast({
+        title: 'Success',
+        description: 'Ingredients cleared successfully',
+      });
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to clear ingredients:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to clear ingredients',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -95,12 +169,6 @@ export function Settings() {
               <Label>Email</Label>
               <div className="px-3 py-2 rounded-md border bg-muted text-sm font-medium">
                 {user?.email}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <div className="px-3 py-2 rounded-md border bg-muted text-sm font-medium">
-                {user?.role}
               </div>
             </div>
           </CardContent>

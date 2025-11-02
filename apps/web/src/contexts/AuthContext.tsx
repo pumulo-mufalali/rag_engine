@@ -1,89 +1,134 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { Role } from '@istock/shared';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  type User as FirebaseUser,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { getUserProfile, createUserProfile, type UserProfile } from '@/lib/firestore-services';
+import { getFirebaseErrorMessage } from '@/lib/firebase-errors';
 
 interface User {
   id: string;
   email: string;
-  role: Role;
+  role: 'Farmer';
+  displayName?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, role: Role) => Promise<void>;
-  logout: () => void;
+  signup: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const STORAGE_KEY = 'istock_auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // Listen to auth state changes
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const userData = JSON.parse(stored);
-        setUser(userData);
-      } catch (error) {
-        console.error('Failed to parse stored auth data:', error);
-        localStorage.removeItem(STORAGE_KEY);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        try {
+          // Get user profile from Firestore
+          const profile = await getUserProfile(firebaseUser.uid);
+          
+          if (profile) {
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              role: profile.role,
+              displayName: profile.displayName,
+            });
+          } else {
+            // If no profile exists, create one with default role
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              role: 'Farmer',
+            });
+          }
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+          // Fallback to basic user info
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            role: 'Farmer',
+          });
+        }
+      } else {
+        setUser(null);
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
-    // Mock authentication - in production, this would call Firebase Auth
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // For demo purposes, accept any email/password combination
-    // In production, this would validate against Firebase Auth
-    const mockUser: User = {
-      id: `user_${Date.now()}`,
-      email,
-      role: 'Farmer', // Default role, could be fetched from server
-    };
-
-    setUser(mockUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Auth state listener will update user automatically
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   };
 
-  const signup = async (email: string, password: string, role: Role) => {
-    // Mock signup - in production, this would call Firebase Auth
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const mockUser: User = {
-      id: `user_${Date.now()}`,
-      email,
-      role,
-    };
-
-    setUser(mockUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
+  const signup = async (email: string, password: string) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Create user profile in Firestore - always Farmer role
+      await createUserProfile(userCredential.user.uid, {
+        email,
+        role: 'Farmer',
+      });
+      
+      // Auth state listener will update user automatically
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      // Auth state listener will update user automatically
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   };
 
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
+    isLoading,
     login,
     signup,
     logout,
   };
 
-  // Don't render children until we've checked localStorage
+  // Show loading state while checking auth
   if (isLoading) {
-    return null; // Or a loading spinner
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-muted-foreground">Loading...</span>
+        </div>
+      </div>
+    );
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -15,6 +15,14 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import type { FeedIngredient } from '@istock/shared';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import {
+  getIngredients,
+  saveIngredient,
+  updateIngredient,
+  deleteIngredient as deleteIngredientFromFirestore,
+} from '@/lib/firestore-services';
 
 const ingredientLibrarySchema = z.object({
   name: z.string().min(1, 'Ingredient name is required'),
@@ -48,11 +56,34 @@ export function IngredientLibrary() {
     },
   });
 
+  const { user } = useAuth();
+  const { toast } = useToast();
+
   useEffect(() => {
-    // Load ingredients from localStorage
-    const stored = JSON.parse(localStorage.getItem('istock_ingredients') || '[]');
-    setIngredients(stored);
-  }, []);
+    if (!user?.id) return;
+
+    const loadIngredients = async () => {
+      try {
+        const ingredientsList = await getIngredients(user.id);
+        // Convert Firestore ingredient format to FeedIngredient format
+        const converted = ingredientsList.map((ing) => ({
+          name: ing.name,
+          unitPrice: ing.unitPrice,
+          nutritionalValues: ing.nutritionalValues,
+        }));
+        setIngredients(converted);
+      } catch (error) {
+        console.error('Failed to load ingredients:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load ingredients',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    loadIngredients();
+  }, [user?.id, toast]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -66,34 +97,87 @@ export function IngredientLibrary() {
     );
   }, [searchQuery, ingredients]);
 
-  const onSubmit = (data: IngredientFormData) => {
-    const newIngredient: FeedIngredient = {
-      ...data,
-      nutritionalValues: data.nutritionalValues,
-    };
+  const onSubmit = async (data: IngredientFormData) => {
+    if (!user?.id) return;
 
-    if (editingId) {
-      // Update existing
-      const updated = ingredients.map((ing) =>
-        ing.name === editingId ? newIngredient : ing
-      );
-      setIngredients(updated);
-      localStorage.setItem('istock_ingredients', JSON.stringify(updated));
-      setEditingId(null);
-    } else {
-      // Add new
-      const updated = [...ingredients, newIngredient];
-      setIngredients(updated);
-      localStorage.setItem('istock_ingredients', JSON.stringify(updated));
-      setShowAddForm(false);
+    try {
+      if (editingId) {
+        // Update existing - find the ingredient by the editingId
+        const ingredientToUpdate = ingredients.find((ing) => ing.name === editingId);
+        if (ingredientToUpdate) {
+          // Find the Firestore document ID (userId-name)
+          const documentId = `${user.id}-${editingId.toLowerCase().replace(/\s+/g, '-')}`;
+          await updateIngredient(user.id, documentId, {
+            name: data.name,
+            unitPrice: data.unitPrice,
+            nutritionalValues: data.nutritionalValues,
+          });
+          
+          // Update local state
+          const updated = ingredients.map((ing) =>
+            ing.name === editingId ? { ...data, nutritionalValues: data.nutritionalValues } : ing
+          );
+          setIngredients(updated);
+          setEditingId(null);
+          
+          toast({
+            title: 'Success',
+            description: 'Ingredient updated successfully',
+          });
+        }
+      } else {
+        // Add new
+        await saveIngredient(user.id, {
+          name: data.name,
+          unitPrice: data.unitPrice,
+          nutritionalValues: data.nutritionalValues,
+        });
+        
+        const newIngredient: FeedIngredient = {
+          ...data,
+          nutritionalValues: data.nutritionalValues,
+        };
+        setIngredients([...ingredients, newIngredient]);
+        setShowAddForm(false);
+        
+        toast({
+          title: 'Success',
+          description: 'Ingredient added successfully',
+        });
+      }
+      form.reset();
+    } catch (error) {
+      console.error('Failed to save ingredient:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save ingredient',
+        variant: 'destructive',
+      });
     }
-    form.reset();
   };
 
-  const deleteIngredient = (name: string) => {
-    const updated = ingredients.filter((ing) => ing.name !== name);
-    setIngredients(updated);
-    localStorage.setItem('istock_ingredients', JSON.stringify(updated));
+  const deleteIngredient = async (name: string) => {
+    if (!user?.id || !confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+    try {
+      const documentId = `${user.id}-${name.toLowerCase().replace(/\s+/g, '-')}`;
+      await deleteIngredientFromFirestore(user.id, documentId);
+      
+      const updated = ingredients.filter((ing) => ing.name !== name);
+      setIngredients(updated);
+      
+      toast({
+        title: 'Success',
+        description: 'Ingredient deleted successfully',
+      });
+    } catch (error) {
+      console.error('Failed to delete ingredient:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete ingredient',
+        variant: 'destructive',
+      });
+    }
   };
 
   const startEdit = (ingredient: FeedIngredient) => {
