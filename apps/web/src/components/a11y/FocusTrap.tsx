@@ -1,4 +1,4 @@
-import { ReactNode, useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface FocusTrapProps {

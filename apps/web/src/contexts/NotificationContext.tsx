@@ -1,14 +1,9 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { toast } from '@/hooks/use-toast';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
-interface Notification {
-  id: string;
-  type: NotificationType;
-  message: string;
-  duration?: number;
-}
+// Removed unused Notification interface
 
 interface NotificationContextType {
   notify: (type: NotificationType, message: string, duration?: number) => void;
@@ -26,7 +21,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const notify = (
     type: NotificationType,
     message: string,
-    duration = 3000
+    _duration = 3000
   ) => {
     toast({
       variant: type === 'error' ? 'destructive' : 'default',

@@ -88,10 +88,10 @@ export function useKeyboardShortcuts(
     const eventTarget = target || (scope === 'global' ? window : null);
     if (!eventTarget) return;
 
-    eventTarget.addEventListener('keydown', handleKeyDown);
+    eventTarget.addEventListener('keydown', handleKeyDown as EventListener);
 
     return () => {
-      eventTarget.removeEventListener('keydown', handleKeyDown);
+      eventTarget.removeEventListener('keydown', handleKeyDown as EventListener);
     };
   }, [enabled, scope, target, handleKeyDown]);
 }

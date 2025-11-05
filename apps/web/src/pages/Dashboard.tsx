@@ -3,7 +3,7 @@ import { MessageSquare, Calculator, TrendingUp, DollarSign } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { QuickActions } from '@/components/dashboard/QuickActions';
-import { Card, CardContent } from '@/components/ui/card';
+// Removed unused Card imports
 import type { AppRoute } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { getChatHistory } from '@/lib/firestore-services';
@@ -23,7 +23,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   });
 
   const [activities, setActivities] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) {

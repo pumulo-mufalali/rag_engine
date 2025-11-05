@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Menu, X, LogOut, MessageSquare, Calculator, LayoutDashboard, FileText, BookOpen, Settings, Home } from 'lucide-react';
+import { Menu, X, LogOut, MessageSquare, Calculator, LayoutDashboard, FileText, BookOpen, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ export function AppLayout({
 }: AppLayoutProps) {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [focusedNavIndex, setFocusedNavIndex] = useState<number | null>(null);
+  const [, setFocusedNavIndex] = useState<number | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const navItemsRef = useRef<(HTMLButtonElement | null)[]>([]);
 

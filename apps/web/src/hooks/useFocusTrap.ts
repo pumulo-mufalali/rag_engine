@@ -1,4 +1,4 @@
-import { useEffect, useRef, RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { trapFocus, getFirstFocusableElement } from '@/lib/accessibility';
 
 interface UseFocusTrapOptions {

@@ -27,6 +27,7 @@ interface Env {
   
   // API
   trpcEndpoint: string;
+  ragApiUrl?: string;
   
   // Environment
   environment: 'development' | 'staging' | 'production';
@@ -44,6 +45,7 @@ function getEnvVar(key: string, defaultValue?: string): string {
     const optionalVars = [
       'VITE_FIREBASE_MEASUREMENT_ID',
       'VITE_SENTRY_DSN',
+      'VITE_RAG_API_URL', // Optional - only needed when using real RAG Engine
     ];
     if (!optionalVars.includes(key)) {
       console.warn(`Environment variable ${key} is not set`);
@@ -87,6 +89,7 @@ export const env: Env = {
   },
   
   trpcEndpoint: getEnvVar('VITE_TRPC_ENDPOINT', 'http://localhost:5001/trpc'),
+  ragApiUrl: getEnvVar('VITE_RAG_API_URL'), // Optional - RAG Engine API URL
   
   environment: (getEnvVar('VITE_ENVIRONMENT', 'development') || 'development') as Env['environment'],
   

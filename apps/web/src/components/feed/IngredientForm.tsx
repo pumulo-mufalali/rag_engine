@@ -6,7 +6,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { type UseFormReturn } from 'react-hook-form';
+import { type UseFormReturn, type ControllerRenderProps } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 
@@ -40,7 +40,7 @@ export function IngredientForm({
         <FormField
           control={form.control}
           name={`ingredients.${index}.name`}
-          render={({ field }) => (
+          render={({ field }: { field: ControllerRenderProps<any, string> }) => (
             <FormItem>
               <FormLabel>Ingredient Name</FormLabel>
               <FormControl>
@@ -54,7 +54,7 @@ export function IngredientForm({
         <FormField
           control={form.control}
           name={`ingredients.${index}.unitPrice`}
-          render={({ field }) => (
+          render={({ field }: { field: ControllerRenderProps<any, string> }) => (
             <FormItem>
               <FormLabel>Unit Price (USD)</FormLabel>
               <FormControl>
@@ -77,7 +77,7 @@ export function IngredientForm({
         <FormField
           control={form.control}
           name={`ingredients.${index}.nutritionalValues.protein`}
-          render={({ field }) => (
+          render={({ field }: { field: ControllerRenderProps<any, string> }) => (
             <FormItem>
               <FormLabel>Protein (%)</FormLabel>
               <FormControl>
@@ -101,7 +101,7 @@ export function IngredientForm({
         <FormField
           control={form.control}
           name={`ingredients.${index}.nutritionalValues.energy`}
-          render={({ field }) => (
+          render={({ field }: { field: ControllerRenderProps<any, string> }) => (
             <FormItem>
               <FormLabel>Energy (Mcal/kg)</FormLabel>
               <FormControl>

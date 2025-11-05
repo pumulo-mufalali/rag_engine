@@ -50,7 +50,7 @@ export async function getDocument<T extends DocumentData>(
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as T;
+      return { id: docSnap.id, ...docSnap.data() } as unknown as T;
     }
     return null;
   } catch (error: any) {
@@ -87,7 +87,7 @@ export async function getCollection<T extends DocumentData>(
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    })) as T[];
+    })) as unknown as T[];
   } catch (error: any) {
     // Provide helpful error message for permission errors
     if (error?.code === 'permission-denied') {

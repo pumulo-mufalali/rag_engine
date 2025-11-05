@@ -3,7 +3,6 @@
  */
 
 import {
-  getCollection,
   getDocument,
   setDocument,
   updateDocument,

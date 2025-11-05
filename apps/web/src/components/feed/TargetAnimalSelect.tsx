@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { type UseFormReturn } from 'react-hook-form';
+import { type UseFormReturn, type ControllerRenderProps } from 'react-hook-form';
 
 interface TargetAnimalSelectProps {
   form: UseFormReturn<any>;
@@ -29,7 +29,7 @@ export function TargetAnimalSelect({ form }: TargetAnimalSelectProps) {
     <FormField
       control={form.control}
       name="targetAnimal"
-      render={({ field }) => (
+      render={({ field }: { field: ControllerRenderProps<any, string> }) => (
         <FormItem>
           <FormLabel>Target Animal</FormLabel>
           <Select onValueChange={field.onChange} defaultValue={field.value}>

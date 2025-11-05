@@ -31,7 +31,7 @@ export function HealthRecords() {
   const [filteredRecords, setFilteredRecords] = useState<HealthRecord[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;

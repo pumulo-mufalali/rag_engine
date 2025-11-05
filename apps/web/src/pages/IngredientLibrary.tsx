@@ -3,7 +3,7 @@ import { Search, Plus, Trash2, Edit2, BookOpen, Save } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useForm } from 'react-hook-form';
+import { useForm, type ControllerRenderProps } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -113,7 +113,12 @@ export function IngredientLibrary() {
           await updateIngredient(user.id, documentId, {
             name: data.name,
             unitPrice: data.unitPrice,
-            nutritionalValues: data.nutritionalValues,
+            nutritionalValues: {
+              protein: data.nutritionalValues.protein ?? 0,
+              energy: data.nutritionalValues.energy ?? 0,
+              fiber: data.nutritionalValues.fiber,
+              fat: data.nutritionalValues.fat,
+            },
           });
           
           // Update local state
@@ -133,7 +138,12 @@ export function IngredientLibrary() {
         await saveIngredient(user.id, {
           name: data.name,
           unitPrice: data.unitPrice,
-          nutritionalValues: data.nutritionalValues,
+          nutritionalValues: {
+            protein: data.nutritionalValues.protein ?? 0,
+            energy: data.nutritionalValues.energy ?? 0,
+            fiber: data.nutritionalValues.fiber,
+            fat: data.nutritionalValues.fat,
+          },
         });
         
         const newIngredient: FeedIngredient = {
@@ -246,7 +256,7 @@ export function IngredientLibrary() {
                     <FormField
                       control={form.control}
                       name="name"
-                      render={({ field }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, string> }) => (
                         <FormItem>
                           <FormLabel>Ingredient Name</FormLabel>
                           <FormControl>
@@ -264,7 +274,7 @@ export function IngredientLibrary() {
                     <FormField
                       control={form.control}
                       name="unitPrice"
-                      render={({ field }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, string> }) => (
                         <FormItem>
                           <FormLabel>Unit Price (USD)</FormLabel>
                           <FormControl>
@@ -286,7 +296,7 @@ export function IngredientLibrary() {
                     <FormField
                       control={form.control}
                       name="nutritionalValues.protein"
-                      render={({ field }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, string> }) => (
                         <FormItem>
                           <FormLabel>Protein (%)</FormLabel>
                           <FormControl>
@@ -309,7 +319,7 @@ export function IngredientLibrary() {
                     <FormField
                       control={form.control}
                       name="nutritionalValues.energy"
-                      render={({ field }) => (
+                      render={({ field }: { field: ControllerRenderProps<any, string> }) => (
                         <FormItem>
                           <FormLabel>Energy (Mcal/kg)</FormLabel>
                           <FormControl>

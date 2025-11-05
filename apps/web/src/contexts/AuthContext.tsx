@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -7,7 +7,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getUserProfile, createUserProfile, type UserProfile } from '@/lib/firestore-services';
+import { getUserProfile, createUserProfile } from '@/lib/firestore-services';
 import { getFirebaseErrorMessage } from '@/lib/firebase-errors';
 
 interface User {

@@ -21,7 +21,7 @@ interface UseLiveRegionOptions {
  * ```
  */
 export function useLiveRegion(options: UseLiveRegionOptions = {}) {
-  const { level = 'polite', atomic = true } = options;
+  const { level = 'polite' } = options;
   const timeoutRef = useRef<number | null>(null);
 
   const announce = (message: string, priority?: 'polite' | 'assertive') => {

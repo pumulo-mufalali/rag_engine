@@ -65,7 +65,7 @@ export function Chatbot() {
   const [editTitle, setEditTitle] = useState('');
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [currentChatTitle, setCurrentChatTitle] = useState<string | null>(null);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [, setIsLoadingHistory] = useState(false);
   const askRag = useAskRag();
   const { announce } = useLiveRegion({ level: 'polite' });
   const historySheetRef = useRef<HTMLDivElement>(null);

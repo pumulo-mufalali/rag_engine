@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { moveFocus } from '@/lib/accessibility';
 
 interface UseSkipLinkOptions {
