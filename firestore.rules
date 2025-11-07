@@ -31,27 +31,23 @@ service cloud.firestore {
     }
     
     // Chats collection
-    // - User can only read, write, and create chat documents where their uid is in the members array
+    // - User can only read, write, and create chat documents where userId matches their uid
     match /chats/{chatId} {
-      // For existing documents, check if user is in members array
+      // For existing documents, check if userId matches authenticated user
       allow read: if isAuthenticated() && 
-                     resource.data.members != null && 
-                     resource.data.members.hasAny([request.auth.uid]);
+                     resource.data.userId == request.auth.uid;
       
-      // For updates, check if user is in members array
+      // For updates, check if userId matches authenticated user
       allow update: if isAuthenticated() && 
-                      resource.data.members != null && 
-                      resource.data.members.hasAny([request.auth.uid]);
+                      resource.data.userId == request.auth.uid;
       
-      // For creates, ensure user is in the members array of the new document
+      // For creates, ensure userId matches authenticated user
       allow create: if isAuthenticated() && 
-                      request.resource.data.members != null && 
-                      request.resource.data.members.hasAny([request.auth.uid]);
+                      request.resource.data.userId == request.auth.uid;
       
-      // Allow delete only if user is a member
+      // Allow delete only if userId matches authenticated user
       allow delete: if isAuthenticated() && 
-                      resource.data.members != null && 
-                      resource.data.members.hasAny([request.auth.uid]);
+                      resource.data.userId == request.auth.uid;
     }
     
     // Ingredients collection

@@ -5,6 +5,7 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 // import { getAuth } from 'firebase-admin/auth'; // Uncomment when you enable authentication
 import { GoogleAuth } from 'google-auth-library';
 import * as path from 'path';
+import * as functions from 'firebase-functions';
 import { handleCorsPreflight, setCorsHeaders } from './cors';
 
 // Load environment variables from .env file (for local development)
@@ -37,11 +38,25 @@ interface RagResponse {
 
 /**
  * Get RAG Engine configuration from environment variables
+ * Supports both new process.env and legacy functions.config() API
  */
 function getRagConfig() {
-  const projectId = process.env.RAG_ENGINE_PROJECT_ID;
-  const location = process.env.RAG_ENGINE_LOCATION;
-  const ragEngineId = process.env.RAG_ENGINE_ID;
+  // Try new environment variables first (for v2 functions)
+  let projectId = process.env.RAG_ENGINE_PROJECT_ID;
+  let location = process.env.RAG_ENGINE_LOCATION;
+  let ragEngineId = process.env.RAG_ENGINE_ID;
+
+  // Fall back to legacy functions.config() API if not set
+  if (!projectId || !location || !ragEngineId) {
+    try {
+      const config = functions.config();
+      projectId = projectId || config.rag?.engine_project_id;
+      location = location || config.rag?.engine_location;
+      ragEngineId = ragEngineId || config.rag?.engine_id;
+    } catch (e) {
+      // Ignore if config API is not available
+    }
+  }
 
   if (!projectId) {
     throw new Error('RAG_ENGINE_PROJECT_ID environment variable is not set');
@@ -194,7 +209,7 @@ export const ragQuery = onRequest(
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
         console.error('RAG Engine API error:', {
           status: response.status,
           statusText: response.statusText,
@@ -211,14 +226,20 @@ export const ragQuery = onRequest(
         throw new Error(`RAG Engine API error (${response.status}): ${errorData.error?.message || response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        contexts?: Array<Record<string, unknown>>;
+        contextChunks?: Array<Record<string, unknown>>;
+        scores?: number[];
+        response?: string;
+        confidence?: number;
+      };
 
       // Step 6: Format response
       const contexts = data.contexts || data.contextChunks || [];
       const scores = data.scores || [];
 
       const ragResponse: RagResponse = {
-        text: contexts[0]?.text || contexts[0]?.content || data.response || 'No response generated',
+        text: (contexts[0]?.text as string) || (contexts[0]?.content as string) || data.response || 'No response generated',
         sources: contexts.map((ctx: unknown, idx: number) => {
           const context = ctx as Record<string, unknown>;
           return {

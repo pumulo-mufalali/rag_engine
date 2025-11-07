@@ -1,4 +1,5 @@
-import { onRequest } from 'firebase-functions/v2/https';
+import { onRequest, Request } from 'firebase-functions/v2/https';
+import { Response } from 'express';
 import { setCorsHeaders, ALLOWED_ORIGINS } from './cors';
 
 /**
@@ -14,7 +15,7 @@ export const root = onRequest(
     timeoutSeconds: 60,
     memory: '256MiB',
   },
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     // ========================================
     // CRITICAL: OPTIONS handling MUST be FIRST
     // ========================================

@@ -1,0 +1,458 @@
+import dotenv from 'dotenv';
+import { onRequest, Request } from 'firebase-functions/v2/https';
+import { Response } from 'express';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { VertexRagServiceClient } from '@google-cloud/aiplatform';
+import * as path from 'path';
+import * as functions from 'firebase-functions';
+import { handleCorsPreflight, setCorsHeaders } from './cors';
+
+// Load environment variables from .env file (for local development)
+// In production, these should be set via Firebase Functions config
+const envPath = path.join(__dirname, '..', '.env');
+const result = dotenv.config({ path: envPath });
+
+if (result.error && process.env.NODE_ENV !== 'production') {
+  console.warn(`Warning: Could not load .env file from ${envPath}. Make sure your .env file exists or set environment variables via Firebase config.`);
+}
+
+// Initialize Firebase Admin (only if not already initialized)
+if (getApps().length === 0) {
+  initializeApp();
+}
+
+interface RagResponse {
+  text: string;
+  sources: Array<{ uri: string; title: string }>;
+  confidence: number;
+}
+
+/**
+ * Get RAG Engine configuration from environment variables
+ * Supports both new process.env and legacy functions.config() API
+ */
+function getRagConfig() {
+  // Try new environment variables first (for v2 functions)
+  let projectId = process.env.RAG_ENGINE_PROJECT_ID;
+  let location = process.env.RAG_ENGINE_LOCATION;
+  let ragEngineId = process.env.RAG_ENGINE_ID;
+
+  // Fall back to legacy functions.config() API if not set
+  if (!projectId || !location || !ragEngineId) {
+    try {
+      const config = functions.config();
+      projectId = projectId || config.rag?.engine_project_id;
+      location = location || config.rag?.engine_location;
+      ragEngineId = ragEngineId || config.rag?.engine_id;
+    } catch (e) {
+      // Ignore if config API is not available
+    }
+  }
+
+  if (!projectId) {
+    throw new Error('RAG_ENGINE_PROJECT_ID environment variable is not set');
+  }
+
+  if (!location) {
+    throw new Error('RAG_ENGINE_LOCATION environment variable is not set');
+  }
+
+  if (!ragEngineId) {
+    throw new Error('RAG_ENGINE_ID environment variable is not set');
+  }
+
+  return { projectId, location, ragEngineId };
+}
+
+/**
+ * Initialize Vertex RAG Service client
+ */
+function getVertexRagClient(projectId: string, location: string) {
+  return new VertexRagServiceClient({
+    apiEndpoint: `${location}-aiplatform.googleapis.com`,
+    projectId: projectId,
+  });
+}
+
+/**
+ * tRPC endpoint handler for RAG queries
+ * 
+ * This function:
+ * 1. Handles CORS preflight requests (OPTIONS)
+ * 2. Parses tRPC-style requests
+ * 3. Calls Google Cloud RAG Engine API
+ * 4. Returns formatted response
+ * 
+ * Environment variables required (in functions/.env or Firebase config):
+ * - RAG_ENGINE_PROJECT_ID: Your Google Cloud project ID
+ * - RAG_ENGINE_LOCATION: Location of RAG Engine (e.g., us-east1)
+ * - RAG_ENGINE_ID: Your RAG Engine ID
+ * 
+ * POST /trpc
+ * Body: { "prompt": "your question here", "context": "optional context" }
+ */
+export const trpc = onRequest(
+  {
+    region: process.env.RAG_ENGINE_LOCATION || 'us-east1',
+    maxInstances: 10,
+    timeoutSeconds: 60,
+    memory: '512MiB',
+  },
+  async (req: Request, res: Response) => {
+    // ========================================
+    // CRITICAL: OPTIONS handling MUST be FIRST
+    // ========================================
+    if (handleCorsPreflight(req, res)) {
+      return; // Preflight handled, stop execution
+    }
+
+    // ========================================
+    // Set CORS headers for actual requests
+    // ========================================
+    const allowedOrigin = setCorsHeaders(req, res);
+    
+    if (req.headers.origin && !allowedOrigin) {
+      res.status(403).json({ error: 'Origin not allowed by CORS policy' });
+      return;
+    }
+
+    // ========================================
+    // Handle ACTUAL requests (e.g., POST)
+    // ========================================
+    
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed. Use POST.' });
+      return;
+    }
+
+    try {
+      // Parse the request path for tRPC routing (if needed)
+      const path = req.path || '';
+      console.log('tRPC Handler - Parsed path:', path);
+      console.log('tRPC Handler - Content-Type:', req.headers['content-type']);
+      console.log('tRPC Handler - Request method:', req.method);
+      console.log('tRPC Handler - Request body type:', typeof req.body);
+      console.log('tRPC Handler - Raw body exists:', !!req.body);
+      console.log('tRPC Handler - Body is object:', typeof req.body === 'object');
+      console.log('tRPC Handler - Body is string:', typeof req.body === 'string');
+
+      // Parse request body
+      // Frontend sends: { prompt: string, context?: string }
+      // Firebase Functions v2 may auto-parse JSON, but handle both cases
+      let body: any = {};
+      
+      if (req.body) {
+        // If body is already parsed (object)
+        if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+          body = req.body;
+        } else if (typeof req.body === 'string') {
+          // If body is a string, parse it
+          try {
+            body = JSON.parse(req.body);
+          } catch (e) {
+            console.error('Failed to parse body as JSON:', e);
+            res.status(400).json({ error: 'Invalid JSON in request body' });
+            return;
+          }
+        }
+      } else {
+        // Body might be in raw format - try to read it
+        // For Firebase Functions v2, body should be auto-parsed, but check anyway
+        console.warn('Request body is empty or undefined');
+      }
+      
+      console.log('tRPC Handler - Parsed body:', JSON.stringify(body));
+      console.log('tRPC Handler - Body keys:', Object.keys(body || {}));
+      console.log('tRPC Handler - Extracting prompt from body...');
+      console.log('tRPC Handler - Body.prompt:', body.prompt);
+      console.log('tRPC Handler - Body.prompt type:', typeof body.prompt);
+
+      let prompt: string;
+      let context: string | undefined;
+
+      // Handle different request formats
+      if (body.prompt) {
+        // Direct format: { prompt: string, context?: string }
+        prompt = body.prompt;
+        context = body.context;
+        console.log('tRPC Handler - Prompt extracted:', prompt);
+        console.log('tRPC Handler - Context:', context);
+      } else if (body.query) {
+        // Alternative format: { query: string, context?: string }
+        prompt = body.query;
+        context = body.context;
+      } else if (body.data?.prompt) {
+        // Wrapped format: { data: { prompt: string, context?: string } }
+        prompt = body.data.prompt;
+        context = body.data.context;
+      } else if (body.data?.query) {
+        // Wrapped format: { data: { query: string, context?: string } }
+        prompt = body.data.query;
+        context = body.data.context;
+      } else {
+        console.error('tRPC Handler - Invalid request body format:', body);
+        res.status(400).json({ 
+          error: 'Invalid request format. Expected { prompt: string, context?: string }',
+          received: body 
+        });
+        return;
+      }
+
+      // Validate prompt
+      if (!prompt || typeof prompt !== 'string') {
+        res.status(400).json({ error: 'Prompt is required and must be a string' });
+        return;
+      }
+
+      if (prompt.length < 3) {
+        res.status(400).json({ error: 'Prompt must be at least 3 characters long' });
+        return;
+      }
+
+      if (prompt.length > 2000) {
+        res.status(400).json({ error: 'Prompt must be less than 2000 characters' });
+        return;
+      }
+
+      console.log('tRPC Handler - Prompt validated, length:', prompt.length);
+      console.log('tRPC Handler - About to get RAG config...');
+
+      // Get configuration
+      let projectId: string;
+      let location: string;
+      let ragEngineId: string;
+      
+      try {
+        const config = getRagConfig();
+        projectId = config.projectId;
+        location = config.location;
+        ragEngineId = config.ragEngineId;
+        console.log('tRPC Handler - RAG Config retrieved successfully');
+      } catch (error: any) {
+        console.error('tRPC Handler - Error getting RAG config:', error);
+        console.error('tRPC Handler - Error stack:', error.stack);
+        throw error;
+      }
+      
+      console.log('tRPC Handler - RAG Config:', {
+        projectId,
+        location,
+        ragEngineId,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Verify we're using the correct corpus ID
+      if (ragEngineId !== '6301661778598166528') {
+        console.error('WARNING: Using incorrect RAG Engine ID:', ragEngineId, 'Expected: 6301661778598166528');
+      }
+
+      // Use Vertex AI SDK instead of REST API for better reliability
+      console.log('tRPC Handler - Using Vertex AI SDK to query RAG corpus...');
+      
+      const ragClient = getVertexRagClient(projectId, location);
+      const parent = `projects/${projectId}/locations/${location}`;
+      const ragCorpusName = `projects/${projectId}/locations/${location}/ragCorpora/${ragEngineId}`;
+      
+      console.log('tRPC Handler - Parent:', parent);
+      console.log('tRPC Handler - RAG Corpus name:', ragCorpusName);
+      
+      try {
+        // Use the Vertex AI SDK to retrieve contexts
+        // The SDK handles the correct endpoint format automatically
+        const result = await ragClient.retrieveContexts({
+          parent: parent,
+          query: {
+            text: prompt,
+            ...(context && { context: context }),
+          },
+          vertexRagStore: {
+            ragResources: [{
+              ragCorpus: ragCorpusName,
+            }],
+          },
+        });
+
+        const response = result[0] as any; // First element is the response
+        console.log('tRPC Handler - Vertex AI SDK response received');
+        console.log('tRPC Handler - Response keys:', Object.keys(response || {}));
+        console.log('tRPC Handler - Response structure:', JSON.stringify(response, null, 2));
+        
+        // Format response from SDK
+        // The Vertex AI SDK response structure may vary - try multiple possible formats
+        let contextsArray: any[] = [];
+        let scores: number[] = [];
+        
+        // Handle nested contexts structure: response.contexts.contexts
+        if (response.contexts) {
+          if (Array.isArray(response.contexts)) {
+            // Direct array: response.contexts = [...]
+            contextsArray = response.contexts;
+          } else if (response.contexts.contexts && Array.isArray(response.contexts.contexts)) {
+            // Nested structure: response.contexts.contexts = [...]
+            contextsArray = response.contexts.contexts;
+          } else if (response.contexts.contexts) {
+            // Single nested context
+            contextsArray = [response.contexts.contexts];
+          } else {
+            // Single context object
+            contextsArray = [response.contexts];
+          }
+        } else if (response.ragContexts && Array.isArray(response.ragContexts)) {
+          contextsArray = response.ragContexts;
+        } else if (response.ragContexts) {
+          contextsArray = [response.ragContexts];
+        } else if (response.contextChunks && Array.isArray(response.contextChunks)) {
+          contextsArray = response.contextChunks;
+        } else if (response.contextChunks) {
+          contextsArray = [response.contextChunks];
+        }
+        
+        // Extract scores - check nested structure too
+        if (response.scores && Array.isArray(response.scores)) {
+          scores = response.scores;
+        } else if (response.contexts?.scores && Array.isArray(response.contexts.scores)) {
+          scores = response.contexts.scores;
+        } else if (response.similarityScores && Array.isArray(response.similarityScores)) {
+          scores = response.similarityScores;
+        } else if (contextsArray.length > 0) {
+          // Extract scores from individual contexts if they have score field
+          scores = contextsArray
+            .map((ctx: any) => ctx.score || ctx._score)
+            .filter((score: any) => typeof score === 'number')
+            .slice(0, 5); // Limit to top 5
+        }
+        
+        console.log('tRPC Handler - Extracted contexts count:', contextsArray.length);
+        console.log('tRPC Handler - Extracted scores count:', scores.length);
+        if (contextsArray.length > 0) {
+          console.log('tRPC Handler - First context structure:', JSON.stringify(contextsArray[0], null, 2));
+          console.log('tRPC Handler - First context keys:', Object.keys(contextsArray[0] || {}));
+        }
+
+        // Extract text from the first context or response
+        let responseText = 'No response generated';
+        if (contextsArray.length > 0) {
+          const firstContext = contextsArray[0];
+          // Try multiple possible text fields, checking for non-empty strings
+          const possibleText = 
+            (firstContext.text && String(firstContext.text).trim()) ||
+            (firstContext.content && String(firstContext.content).trim()) ||
+            (firstContext.contextText && String(firstContext.contextText).trim()) ||
+            (firstContext.ragContext?.text && String(firstContext.ragContext.text).trim()) ||
+            (firstContext.ragContext?.content && String(firstContext.ragContext.content).trim());
+          
+          if (possibleText) {
+            // Clean up text formatting: replace \r\n with spaces, normalize whitespace
+            responseText = possibleText
+              .replace(/\r\n/g, ' ')  // Replace \r\n with space
+              .replace(/\n/g, ' ')    // Replace \n with space
+              .replace(/\r/g, ' ')    // Replace \r with space
+              .replace(/\s+/g, ' ')   // Replace multiple spaces with single space
+              .trim();
+          }
+        }
+        
+        // If still no text, check response-level fields
+        if (responseText === 'No response generated') {
+          const responseLevelText = 
+            (response.response && String(response.response).trim()) ||
+            (response.text && String(response.text).trim());
+          
+          if (responseLevelText) {
+            responseText = responseLevelText
+              .replace(/\r\n/g, ' ')
+              .replace(/\n/g, ' ')
+              .replace(/\r/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+          }
+        }
+        
+        console.log('tRPC Handler - Extracted responseText:', responseText);
+        console.log('tRPC Handler - Response object has response field:', !!response.response);
+        console.log('tRPC Handler - Response object has text field:', !!response.text);
+        
+        const ragResponse: RagResponse = {
+          text: responseText,
+          sources: contextsArray
+            .map((ctx: any, idx: number) => {
+              // Try multiple possible field names for URI and title
+              const uri = ctx.sourceUri 
+                || ctx.uri 
+                || ctx.source?.uri
+                || ctx.metadata?.sourceUri
+                || ctx.metadata?.source
+                || ctx.ragContext?.sourceUri
+                || ctx.ragContext?.uri;
+              
+              // Add sourceDisplayName which is the actual field name in the response
+              const title = ctx.sourceDisplayName
+                || ctx.sourceTitle 
+                || ctx.title 
+                || ctx.source?.title
+                || ctx.metadata?.title
+                || ctx.ragContext?.title
+                || ctx.ragContext?.sourceTitle
+                || 'Reference';
+              
+              // If no valid URI, use a valid URL format (data URI or placeholder URL)
+              const validUri = uri && (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:'))
+                ? uri
+                : `https://rag.istock.local/context-${idx}`; // Use a valid URL format
+              
+              return {
+                uri: validUri,
+                title: title,
+              };
+            })
+            .filter((source: { uri: string; title: string }) => source.uri && source.title), // Only include sources with both URI and title
+          confidence: scores[0] || response.confidence || 0.8,
+        };
+
+        // Log successful request
+        console.log('tRPC RAG request successful', {
+          promptLength: prompt.length,
+          sourcesCount: ragResponse.sources.length,
+        });
+
+        // Return success response
+        res.status(200).json(ragResponse);
+      } catch (error: any) {
+        console.error('tRPC Handler - Vertex AI SDK error:', error);
+        throw error;
+      }
+    } catch (error: unknown) {
+      const errorObj = error as { message?: string; stack?: string };
+      console.error('tRPC RAG Engine error:', {
+        error: errorObj.message,
+        stack: errorObj.stack,
+      });
+
+      // Provide user-friendly error messages
+      let statusCode = 500;
+      let errorMessage = errorObj.message || 'Unknown error occurred';
+
+      if (errorMessage.includes('environment variable')) {
+        statusCode = 500;
+        errorMessage = `Configuration error: ${errorMessage}`;
+      } else if (errorMessage.includes('fetch') || errorMessage.includes('Network')) {
+        statusCode = 503;
+        errorMessage = 'Network error connecting to RAG Engine. Please try again.';
+      } else if (errorMessage.includes('Permission denied')) {
+        statusCode = 403;
+      } else if (errorMessage.includes('not found')) {
+        statusCode = 404;
+      }
+
+      // Ensure CORS headers are set on error responses too
+      setCorsHeaders(req, res);
+      
+      res.status(statusCode).json({
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorObj.stack : undefined,
+      });
+    }
+  }
+);
+
