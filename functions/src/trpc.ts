@@ -75,6 +75,116 @@ function getVertexRagClient(projectId: string, location: string) {
 }
 
 /**
+ * Get access token for Vertex AI API calls
+ */
+async function getAccessToken(): Promise<string> {
+  const { GoogleAuth } = require('google-auth-library');
+  const auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+  const client = await auth.getClient();
+  const accessToken = await client.getAccessToken();
+  return accessToken?.token || '';
+}
+
+/**
+ * Synthesize a concise answer from retrieved contexts using Vertex AI Generative AI (Gemini) via REST API
+ */
+async function synthesizeAnswer(
+  userQuery: string,
+  contexts: string[],
+  projectId: string,
+  location: string
+): Promise<string> {
+  try {
+    // Get access token
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      throw new Error('Failed to get access token');
+    }
+
+    // Combine contexts (use top 5)
+    const combinedContext = contexts
+      .slice(0, 5)
+      .join('\n\n---\n\n');
+
+    // Create prompt for synthesis
+    const systemInstruction = `You are a helpful assistant that provides accurate information about livestock health based on veterinary documents. Provide clear, concise answers (2-4 paragraphs, 200-400 words) using simple, professional language appropriate for farmers. Do not include disclaimers, legal text, or document metadata.`;
+
+    const userPrompt = `Based on the following context from veterinary documents, answer this question: ${userQuery}
+
+Context:
+${combinedContext}`;
+
+    // Call Vertex AI Generative AI REST API
+    const apiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/gemini-1.5-flash:generateContent`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: userPrompt,
+          }],
+        }],
+        systemInstruction: {
+          parts: [{
+            text: systemInstruction,
+          }],
+        },
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.7,
+          topP: 0.95,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Gemini API error:', response.status, errorData);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Extract generated text
+    const candidates = data.candidates || [];
+    if (candidates.length > 0 && candidates[0].content?.parts) {
+      const textParts = candidates[0].content.parts
+        .filter((part: any) => part.text)
+        .map((part: any) => part.text);
+      
+      if (textParts.length > 0) {
+        return textParts.join('\n').trim();
+      }
+    }
+
+    // Fallback if no text generated
+    throw new Error('No text generated from Gemini');
+  } catch (error: any) {
+    console.error('LLM synthesis error:', error);
+    // Fallback: return first context truncated intelligently
+    if (contexts.length > 0) {
+      const truncated = contexts[0].substring(0, 800);
+      const lastPeriod = truncated.lastIndexOf('.');
+      const lastNewline = truncated.lastIndexOf('\n');
+      const cutPoint = Math.max(lastPeriod, lastNewline);
+      
+      if (cutPoint > 400) {
+        return truncated.substring(0, cutPoint + 1);
+      }
+      return truncated + '...';
+    }
+    return 'Unable to generate answer. Please try rephrasing your question.';
+  }
+}
+
+/**
  * tRPC endpoint handler for RAG queries
  * 
  * This function:
@@ -130,6 +240,10 @@ export const trpc = onRequest(
       // Parse the request path for tRPC routing (if needed)
       const path = req.path || '';
       console.log('tRPC Handler - Parsed path:', path);
+      
+      // If path contains procedure name (e.g., /health/askRag), extract it but don't require it
+      // The current implementation doesn't require procedure names in the path
+      
       console.log('tRPC Handler - Content-Type:', req.headers['content-type']);
       console.log('tRPC Handler - Request method:', req.method);
       console.log('tRPC Handler - Request body type:', typeof req.body);
@@ -160,6 +274,8 @@ export const trpc = onRequest(
         // Body might be in raw format - try to read it
         // For Firebase Functions v2, body should be auto-parsed, but check anyway
         console.warn('Request body is empty or undefined');
+        res.status(400).json({ error: 'Request body is required' });
+        return;
       }
       
       console.log('tRPC Handler - Parsed body:', JSON.stringify(body));
@@ -264,7 +380,8 @@ export const trpc = onRequest(
           parent: parent,
           query: {
             text: prompt,
-            ...(context && { context: context }),
+            // Note: context parameter might not be supported in the query object
+            // If needed, it might need to be passed differently
           },
           vertexRagStore: {
             ragResources: [{
@@ -273,48 +390,51 @@ export const trpc = onRequest(
           },
         });
 
-        const response = result[0] as any; // First element is the response
+        // The result is a Promise that resolves to an array
+        const [response] = await result;
         console.log('tRPC Handler - Vertex AI SDK response received');
         console.log('tRPC Handler - Response keys:', Object.keys(response || {}));
         console.log('tRPC Handler - Response structure:', JSON.stringify(response, null, 2));
         
         // Format response from SDK
         // The Vertex AI SDK response structure may vary - try multiple possible formats
+        // Use type assertion to handle dynamic response structure
+        const responseAny = response as any;
         let contextsArray: any[] = [];
         let scores: number[] = [];
         
         // Handle nested contexts structure: response.contexts.contexts
-        if (response.contexts) {
-          if (Array.isArray(response.contexts)) {
+        if (responseAny.contexts) {
+          if (Array.isArray(responseAny.contexts)) {
             // Direct array: response.contexts = [...]
-            contextsArray = response.contexts;
-          } else if (response.contexts.contexts && Array.isArray(response.contexts.contexts)) {
+            contextsArray = responseAny.contexts;
+          } else if (responseAny.contexts.contexts && Array.isArray(responseAny.contexts.contexts)) {
             // Nested structure: response.contexts.contexts = [...]
-            contextsArray = response.contexts.contexts;
-          } else if (response.contexts.contexts) {
+            contextsArray = responseAny.contexts.contexts;
+          } else if (responseAny.contexts.contexts) {
             // Single nested context
-            contextsArray = [response.contexts.contexts];
+            contextsArray = [responseAny.contexts.contexts];
           } else {
             // Single context object
-            contextsArray = [response.contexts];
+            contextsArray = [responseAny.contexts];
           }
-        } else if (response.ragContexts && Array.isArray(response.ragContexts)) {
-          contextsArray = response.ragContexts;
-        } else if (response.ragContexts) {
-          contextsArray = [response.ragContexts];
-        } else if (response.contextChunks && Array.isArray(response.contextChunks)) {
-          contextsArray = response.contextChunks;
-        } else if (response.contextChunks) {
-          contextsArray = [response.contextChunks];
+        } else if (responseAny.ragContexts && Array.isArray(responseAny.ragContexts)) {
+          contextsArray = responseAny.ragContexts;
+        } else if (responseAny.ragContexts) {
+          contextsArray = [responseAny.ragContexts];
+        } else if (responseAny.contextChunks && Array.isArray(responseAny.contextChunks)) {
+          contextsArray = responseAny.contextChunks;
+        } else if (responseAny.contextChunks) {
+          contextsArray = [responseAny.contextChunks];
         }
         
         // Extract scores - check nested structure too
-        if (response.scores && Array.isArray(response.scores)) {
-          scores = response.scores;
-        } else if (response.contexts?.scores && Array.isArray(response.contexts.scores)) {
-          scores = response.contexts.scores;
-        } else if (response.similarityScores && Array.isArray(response.similarityScores)) {
-          scores = response.similarityScores;
+        if (responseAny.scores && Array.isArray(responseAny.scores)) {
+          scores = responseAny.scores;
+        } else if (responseAny.contexts?.scores && Array.isArray(responseAny.contexts.scores)) {
+          scores = responseAny.contexts.scores;
+        } else if (responseAny.similarityScores && Array.isArray(responseAny.similarityScores)) {
+          scores = responseAny.similarityScores;
         } else if (contextsArray.length > 0) {
           // Extract scores from individual contexts if they have score field
           scores = contextsArray
@@ -330,34 +450,31 @@ export const trpc = onRequest(
           console.log('tRPC Handler - First context keys:', Object.keys(contextsArray[0] || {}));
         }
 
-        // Extract text from the first context or response
+        // Extract contexts and synthesize answer using LLM
         let responseText = 'No response generated';
         if (contextsArray.length > 0) {
-          const firstContext = contextsArray[0];
-          // Try multiple possible text fields, checking for non-empty strings
-          const possibleText = 
-            (firstContext.text && String(firstContext.text).trim()) ||
-            (firstContext.content && String(firstContext.content).trim()) ||
-            (firstContext.contextText && String(firstContext.contextText).trim()) ||
-            (firstContext.ragContext?.text && String(firstContext.ragContext.text).trim()) ||
-            (firstContext.ragContext?.content && String(firstContext.ragContext.content).trim());
+          // Extract text from all contexts
+          const contextTexts = contextsArray
+            .map((ctx: any) => {
+              return ctx.text || ctx.content || ctx.contextText || 
+                     ctx.ragContext?.text || ctx.ragContext?.content || '';
+            })
+            .filter((text: string) => text && String(text).trim().length > 0)
+            .map((text: string) => String(text).trim());
           
-          if (possibleText) {
-            // Clean up text formatting: replace \r\n with spaces, normalize whitespace
-            responseText = possibleText
-              .replace(/\r\n/g, ' ')  // Replace \r\n with space
-              .replace(/\n/g, ' ')    // Replace \n with space
-              .replace(/\r/g, ' ')    // Replace \r with space
-              .replace(/\s+/g, ' ')   // Replace multiple spaces with single space
-              .trim();
+          if (contextTexts.length > 0) {
+            console.log('tRPC Handler - Synthesizing answer from', contextTexts.length, 'contexts');
+            // Use LLM to synthesize a concise answer
+            responseText = await synthesizeAnswer(prompt, contextTexts, projectId, location);
+            console.log('tRPC Handler - Synthesized answer length:', responseText.length);
           }
         }
         
-        // If still no text, check response-level fields
+        // Fallback if synthesis didn't work
         if (responseText === 'No response generated') {
           const responseLevelText = 
-            (response.response && String(response.response).trim()) ||
-            (response.text && String(response.text).trim());
+            (responseAny.response && String(responseAny.response).trim()) ||
+            (responseAny.text && String(responseAny.text).trim());
           
           if (responseLevelText) {
             responseText = responseLevelText
@@ -369,45 +486,49 @@ export const trpc = onRequest(
           }
         }
         
-        console.log('tRPC Handler - Extracted responseText:', responseText);
-        console.log('tRPC Handler - Response object has response field:', !!response.response);
-        console.log('tRPC Handler - Response object has text field:', !!response.text);
+        console.log('tRPC Handler - Final responseText length:', responseText.length);
+        
+        // Deduplicate sources by title (or URI if title is generic)
+        const sourceMap = new Map<string, { uri: string; title: string }>();
+        
+        contextsArray.forEach((ctx: any) => {
+          const uri = ctx.sourceUri 
+            || ctx.uri 
+            || ctx.source?.uri
+            || ctx.metadata?.sourceUri
+            || ctx.metadata?.source
+            || ctx.ragContext?.sourceUri
+            || ctx.ragContext?.uri;
+          
+          const title = ctx.sourceDisplayName
+            || ctx.sourceTitle 
+            || ctx.title 
+            || ctx.source?.title
+            || ctx.metadata?.title
+            || ctx.ragContext?.title
+            || ctx.ragContext?.sourceTitle
+            || 'Reference';
+          
+          // Use title as the deduplication key (or URI if title is generic)
+          const key = title !== 'Reference' ? title.toLowerCase().trim() : (uri || 'unknown');
+          
+          // Only add if we haven't seen this source before and it has valid data
+          if (!sourceMap.has(key) && title && title !== 'Reference') {
+            const validUri = uri && (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:'))
+              ? uri
+              : `https://rag.istock.local/${encodeURIComponent(title)}`;
+            
+            sourceMap.set(key, {
+              uri: validUri,
+              title: title,
+            });
+          }
+        });
         
         const ragResponse: RagResponse = {
           text: responseText,
-          sources: contextsArray
-            .map((ctx: any, idx: number) => {
-              // Try multiple possible field names for URI and title
-              const uri = ctx.sourceUri 
-                || ctx.uri 
-                || ctx.source?.uri
-                || ctx.metadata?.sourceUri
-                || ctx.metadata?.source
-                || ctx.ragContext?.sourceUri
-                || ctx.ragContext?.uri;
-              
-              // Add sourceDisplayName which is the actual field name in the response
-              const title = ctx.sourceDisplayName
-                || ctx.sourceTitle 
-                || ctx.title 
-                || ctx.source?.title
-                || ctx.metadata?.title
-                || ctx.ragContext?.title
-                || ctx.ragContext?.sourceTitle
-                || 'Reference';
-              
-              // If no valid URI, use a valid URL format (data URI or placeholder URL)
-              const validUri = uri && (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:'))
-                ? uri
-                : `https://rag.istock.local/context-${idx}`; // Use a valid URL format
-              
-              return {
-                uri: validUri,
-                title: title,
-              };
-            })
-            .filter((source: { uri: string; title: string }) => source.uri && source.title), // Only include sources with both URI and title
-          confidence: scores[0] || response.confidence || 0.8,
+          sources: Array.from(sourceMap.values()), // Convert Map to array of unique sources
+          confidence: scores[0] || responseAny.confidence || 0.8,
         };
 
         // Log successful request
