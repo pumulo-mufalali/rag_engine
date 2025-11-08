@@ -150,7 +150,7 @@ ${combinedContext}`;
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     
     // Extract generated text
     const candidates = data.candidates || [];
@@ -464,7 +464,7 @@ export const trpc = onRequest(
           
           if (contextTexts.length > 0) {
             console.log('tRPC Handler - Synthesizing answer from', contextTexts.length, 'contexts');
-            // Use LLM to synthesize a concise answer
+            // Use LLM to synthesize a concise, well-structured answer
             responseText = await synthesizeAnswer(prompt, contextTexts, projectId, location);
             console.log('tRPC Handler - Synthesized answer length:', responseText.length);
           }
@@ -478,10 +478,8 @@ export const trpc = onRequest(
           
           if (responseLevelText) {
             responseText = responseLevelText
-              .replace(/\r\n/g, ' ')
-              .replace(/\n/g, ' ')
-              .replace(/\r/g, ' ')
-              .replace(/\s+/g, ' ')
+              .replace(/\r\n/g, '\n')
+              .replace(/\n{3,}/g, '\n\n')
               .trim();
           }
         }
@@ -528,7 +526,10 @@ export const trpc = onRequest(
         const ragResponse: RagResponse = {
           text: responseText,
           sources: Array.from(sourceMap.values()), // Convert Map to array of unique sources
-          confidence: scores[0] || responseAny.confidence || 0.8,
+          // Use the highest confidence score from the RAG engine (maximum score = highest confidence)
+          confidence: scores.length > 0 
+            ? Math.max(...scores)  // Use the maximum score (highest confidence)
+            : (responseAny.confidence || 0.8),
         };
 
         // Log successful request
