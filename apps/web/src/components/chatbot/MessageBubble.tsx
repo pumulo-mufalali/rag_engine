@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { type RagResponse } from '@istock/shared';
-import { ExternalLink, User, Bot, ThumbsUp, ThumbsDown, Copy, RefreshCw, Check } from 'lucide-react';
+import { ExternalLink, Bot, ThumbsUp, ThumbsDown, Copy, RefreshCw, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { saveMessageFeedback, type MessageFeedback } from '@/lib/firestore-services';
+import { saveMessageFeedback } from '@/lib/firestore-services';
 
 interface Message {
   id: string;

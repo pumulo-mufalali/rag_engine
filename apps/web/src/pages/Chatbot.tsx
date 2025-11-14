@@ -6,7 +6,7 @@ import { useAskRag } from '@/lib/trpc';
 import { ChatInterface } from '@/components/chatbot/ChatInterface';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Send, History, Edit2, Trash2, X, Check, Loader2, Plus, Mic, MicOff, Square } from 'lucide-react';
+import { Send, Edit2, Trash2, X, Check, Loader2, Plus, Mic, Square } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
@@ -171,7 +171,7 @@ export function Chatbot({ currentRoute = 'chatbot', onRouteChange }: ChatbotProp
                       response: {
                         text: savedChat.response,
                         sources: savedChat.sources || [],
-                        confidence: savedChat.confidence,
+                        confidence: savedChat.confidence ?? 0,
                       },
                     },
                   ]);
@@ -199,7 +199,7 @@ export function Chatbot({ currentRoute = 'chatbot', onRouteChange }: ChatbotProp
                     response: {
                       text: savedChat.response,
                       sources: savedChat.sources || [],
-                      confidence: savedChat.confidence,
+                      confidence: savedChat.confidence ?? 0,
                     },
                   },
                 ]);
@@ -429,7 +429,7 @@ export function Chatbot({ currentRoute = 'chatbot', onRouteChange }: ChatbotProp
         response: {
           text: item.response,
           sources: item.sources || [],
-          confidence: item.confidence,
+          confidence: item.confidence ?? 0,
         },
       },
     ];

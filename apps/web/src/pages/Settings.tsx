@@ -116,21 +116,26 @@ export function Settings() {
     setIsUpdatingProfile(true);
 
     try {
-      let photoURL = user.photoURL || null;
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        throw new Error('User not authenticated');
+      }
+
+      let photoURL: string | null = firebaseUser.photoURL || null;
 
       // Upload profile picture if a new file was selected
       if (profilePictureFile) {
-        const storageRef = ref(storage, `profilePictures/${user.uid}`);
+        const storageRef = ref(storage, `profilePictures/${firebaseUser.uid}`);
         await uploadBytes(storageRef, profilePictureFile);
         photoURL = await getDownloadURL(storageRef);
       }
 
       // Update profile
-      const updateData: { displayName?: string; photoURL?: string } = {};
-      if (displayName.trim() !== user.displayName) {
+      const updateData: { displayName?: string | null; photoURL?: string } = {};
+      if (displayName.trim() !== (user.displayName || '')) {
         updateData.displayName = displayName.trim() || null;
       }
-      if (photoURL && photoURL !== user.photoURL) {
+      if (photoURL && photoURL !== firebaseUser.photoURL) {
         updateData.photoURL = photoURL;
       }
 
@@ -203,10 +208,10 @@ export function Settings() {
             <div className="space-y-2">
               <Label>Profile Picture</Label>
               <div className="flex items-center gap-4">
-                {user?.photoURL ? (
+                {auth.currentUser?.photoURL ? (
                   <img
-                    src={user.photoURL}
-                    alt={user.displayName || 'Profile'}
+                    src={auth.currentUser.photoURL}
+                    alt={user?.displayName || 'Profile'}
                     className="h-16 w-16 rounded-full object-cover border-2 border-primary/20"
                   />
                 ) : (

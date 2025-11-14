@@ -32,8 +32,22 @@ export const root = onRequest(
         res.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
         res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, trpc-accept-type, trpc-content-type');
         res.set('Access-Control-Max-Age', '3600');
+      } else if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+        // Allow localhost for development
+        res.set('Access-Control-Allow-Origin', origin);
+        res.set('Access-Control-Allow-Credentials', 'true');
+        res.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, trpc-accept-type, trpc-content-type');
+        res.set('Access-Control-Max-Age', '3600');
+      } else if (origin && (origin.includes('.web.app') || origin.includes('.firebaseapp.com'))) {
+        // Allow Firebase hosting domains
+        res.set('Access-Control-Allow-Origin', origin);
+        res.set('Access-Control-Allow-Credentials', 'true');
+        res.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, trpc-accept-type, trpc-content-type');
+        res.set('Access-Control-Max-Age', '3600');
       } else {
-        // Still respond to preflight (browser will check headers)
+        // No origin or unknown origin - use wildcard (no credentials)
         res.set('Access-Control-Allow-Origin', origin || '*');
         res.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
         res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, trpc-accept-type, trpc-content-type');

@@ -4,7 +4,7 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { SkipLinks } from '@/components/a11y/SkipLinks';
 
-export type AppRoute = 'chatbot' | 'settings';
+export type AppRoute = 'chatbot' | 'settings' | 'feed-optimizer' | 'health-records' | 'ingredients';
 
 interface AppLayoutProps {
   currentRoute: AppRoute;
@@ -47,12 +47,17 @@ export function AppLayout({
                 aria-label="Open Settings"
                 className={currentRoute === 'settings' ? 'bg-primary/10 text-primary' : ''}
               >
-                {user?.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={user.displayName || 'User profile'}
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
+                {user?.displayName ? (
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-xs font-semibold text-primary">
+                      {user.displayName
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </span>
+                  </div>
                 ) : (
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                     {user?.displayName ? (

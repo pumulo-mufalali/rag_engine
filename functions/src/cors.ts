@@ -12,9 +12,9 @@ export const ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:3000',
   'http://localhost:5176',
-  // TODO: Add your production frontend URL here
-  // 'https://my-app-domain.com',
-  // 'https://www.my-app-domain.com',
+  // Production domains
+  'https://istock-abebc.web.app',
+  'https://istock-abebc.firebaseapp.com',
 ];
 
 /**
@@ -33,6 +33,9 @@ export function setCorsHeaders(req: any, res: Response): string | null {
     allowedOrigin = origin;
   } else if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
     // For development, allow localhost origins even if not in list
+    allowedOrigin = origin;
+  } else if (origin && (origin.includes('.web.app') || origin.includes('.firebaseapp.com'))) {
+    // Allow Firebase hosting domains
     allowedOrigin = origin;
   } else if (!origin) {
     // No origin header (e.g., same-origin request, Postman, etc.)
@@ -92,10 +95,20 @@ export function handleCorsPreflight(req: any, res: Response): boolean {
         res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, trpc-accept-type, trpc-content-type');
         res.set('Access-Control-Max-Age', '3600');
         console.log('CORS Preflight - Allowed localhost origin:', origin);
-      } else {
-        res.set('Access-Control-Allow-Origin', '');
+      } else if (origin.includes('.web.app') || origin.includes('.firebaseapp.com')) {
+        // Allow Firebase hosting domains
+        res.set('Access-Control-Allow-Origin', origin);
+        res.set('Access-Control-Allow-Credentials', 'true');
         res.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
         res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, trpc-accept-type, trpc-content-type');
+        res.set('Access-Control-Max-Age', '3600');
+        console.log('CORS Preflight - Allowed Firebase hosting origin:', origin);
+      } else {
+        // Unknown origin - reject by not setting Access-Control-Allow-Origin
+        // Don't set empty string as that's invalid
+        res.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, trpc-accept-type, trpc-content-type');
+        console.warn('CORS Preflight - Rejecting unknown origin:', origin);
       }
     } else {
       // No origin header - allow with wildcard (no credentials)
